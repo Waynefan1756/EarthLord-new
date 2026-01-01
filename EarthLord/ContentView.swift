@@ -9,19 +9,31 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationStack {
+            VStack {
+                Image(systemName: "globe")
+                    .imageScale(.large)
+                    .foregroundStyle(.tint)
+                Text("Hello, world!")
 
-            Text("Developed by Wayne")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundColor(.blue)
-                .padding(.top, 20)
+                Text("Developed by Wayne")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                    .padding(.top, 20)
+
+                NavigationLink(destination: TestView()) {
+                    Text("进入测试页")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(10)
+                }
+                .padding(.top, 30)
+            }
+            .padding()
         }
-        .padding()
     }
 }
 
