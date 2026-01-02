@@ -17,129 +17,154 @@ struct ProfileTabView: View {
                 ApocalypseTheme.background
                     .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // 用户信息卡片
-                        VStack(spacing: 16) {
-                            // 头像
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                ApocalypseTheme.primary,
-                                                ApocalypseTheme.primaryDark
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // 用户信息卡片
+                            VStack(spacing: 16) {
+                                // 头像
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    ApocalypseTheme.primary,
+                                                    ApocalypseTheme.primaryDark
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
                                         )
-                                    )
-                                    .frame(width: 100, height: 100)
-                                    .shadow(color: ApocalypseTheme.primary.opacity(0.3), radius: 20)
+                                        .frame(width: 100, height: 100)
+                                        .shadow(color: ApocalypseTheme.primary.opacity(0.3), radius: 20)
 
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.white)
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 50))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.top, 40)
+
+                                // 用户信息
+                                if let user = authManager.currentUser {
+                                    Text(user.username)
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(ApocalypseTheme.textPrimary)
+
+                                    if let email = authManager.currentUserEmail {
+                                        Text(email)
+                                            .font(.subheadline)
+                                            .foregroundColor(ApocalypseTheme.textSecondary)
+                                    }
+
+                                    Text("ID: \(user.id.uuidString.prefix(8).uppercased())...")
+                                        .font(.caption)
+                                        .foregroundColor(ApocalypseTheme.textMuted)
+                                } else {
+                                    Text("加载中...")
+                                        .font(.title2)
+                                        .foregroundColor(ApocalypseTheme.textSecondary)
+                                }
                             }
-                            .padding(.top, 40)
-
-                            // 用户名
-                            if let user = authManager.currentUser {
-                                Text(user.username)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(ApocalypseTheme.textPrimary)
-
-                                Text("幸存者 ID: \(user.id.uuidString.prefix(8))")
-                                    .font(.caption)
-                                    .foregroundColor(ApocalypseTheme.textMuted)
-                            } else {
-                                Text("加载中...")
-                                    .font(.title2)
-                                    .foregroundColor(ApocalypseTheme.textSecondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .background(ApocalypseTheme.cardBackground)
-                        .cornerRadius(16)
-                        .padding(.horizontal)
-                        .padding(.top, 20)
-
-                        // 统计信息
-                        HStack(spacing: 16) {
-                            StatCard(title: "领地", value: "0", icon: "map.fill")
-                            StatCard(title: "POI", value: "0", icon: "mappin.circle.fill")
-                            StatCard(title: "资源", value: "0", icon: "cube.fill")
-                        }
-                        .padding(.horizontal)
-
-                        // 功能列表
-                        VStack(spacing: 12) {
-                            NavigationButton(
-                                icon: "gear",
-                                title: "设置",
-                                subtitle: "账户与偏好设置"
-                            ) {
-                                // TODO: 跳转到设置页
-                            }
-
-                            NavigationButton(
-                                icon: "chart.bar.fill",
-                                title: "统计",
-                                subtitle: "查看游戏数据"
-                            ) {
-                                // TODO: 跳转到统计页
-                            }
-
-                            NavigationButton(
-                                icon: "questionmark.circle",
-                                title: "帮助",
-                                subtitle: "游戏指南与FAQ"
-                            ) {
-                                // TODO: 跳转到帮助页
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        // 退出登录按钮
-                        Button(action: {
-                            showLogoutConfirm = true
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.right.square")
-                                    .font(.headline)
-
-                                Text("退出登录")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(ApocalypseTheme.danger)
-                            .cornerRadius(12)
-                            .shadow(color: ApocalypseTheme.danger.opacity(0.3), radius: 10)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 20)
+                            .padding(.vertical, 20)
+                            .padding(.top, 20)
 
-                        Spacer()
+                            // 统计信息
+                            HStack(spacing: 0) {
+                                StatCard(title: "领地", value: "0", icon: "flag.fill")
+
+                                Divider()
+                                    .background(ApocalypseTheme.textMuted.opacity(0.3))
+                                    .frame(height: 60)
+
+                                StatCard(title: "资源点", value: "0", icon: "mappin.circle.fill")
+
+                                Divider()
+                                    .background(ApocalypseTheme.textMuted.opacity(0.3))
+                                    .frame(height: 60)
+
+                                StatCard(title: "探索距离", value: "0", icon: "figure.walk")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal)
+
+                            // 功能列表
+                            VStack(spacing: 0) {
+                                MenuButton(
+                                    icon: "gearshape.fill",
+                                    iconColor: .gray,
+                                    title: "设置"
+                                ) {
+                                    // TODO: 跳转到设置页
+                                }
+
+                                Divider()
+                                    .padding(.leading, 60)
+
+                                MenuButton(
+                                    icon: "bell.fill",
+                                    iconColor: ApocalypseTheme.primary,
+                                    title: "通知"
+                                ) {
+                                    // TODO: 跳转到通知页
+                                }
+
+                                Divider()
+                                    .padding(.leading, 60)
+
+                                MenuButton(
+                                    icon: "questionmark.circle.fill",
+                                    iconColor: .blue,
+                                    title: "帮助"
+                                ) {
+                                    // TODO: 跳转到帮助页
+                                }
+
+                                Divider()
+                                    .padding(.leading, 60)
+
+                                MenuButton(
+                                    icon: "info.circle.fill",
+                                    iconColor: .green,
+                                    title: "关于"
+                                ) {
+                                    // TODO: 跳转到关于页
+                                }
+                            }
+                            .background(ApocalypseTheme.cardBackground)
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                            .padding(.bottom, 20)
+                        }
                     }
-                }
-            }
-            .navigationTitle("个人")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+
+                    // 固定在底部的退出登录按钮
                     Button(action: {
                         showLogoutConfirm = true
                     }) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .foregroundColor(ApocalypseTheme.danger)
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.headline)
+
+                            Text("退出登录")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(ApocalypseTheme.danger)
+                        .cornerRadius(12)
+                        .shadow(color: ApocalypseTheme.danger.opacity(0.3), radius: 10)
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .background(ApocalypseTheme.background)
                 }
             }
+            .navigationTitle("幸存者档案")
+            .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog(
                 "确定要退出登录吗？",
                 isPresented: $showLogoutConfirm,
@@ -166,7 +191,7 @@ struct StatCard: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(ApocalypseTheme.primary)
 
             Text(value)
@@ -179,46 +204,38 @@ struct StatCard: View {
                 .foregroundColor(ApocalypseTheme.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(ApocalypseTheme.cardBackground)
-        .cornerRadius(12)
+        .padding(.vertical, 12)
     }
 }
 
-// MARK: - 导航按钮
+// MARK: - 菜单按钮
 
-struct NavigationButton: View {
+struct MenuButton: View {
     let icon: String
+    let iconColor: Color
     let title: String
-    let subtitle: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack {
+            HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(ApocalypseTheme.primary)
-                    .frame(width: 40)
+                    .font(.title3)
+                    .foregroundColor(iconColor)
+                    .frame(width: 24)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(ApocalypseTheme.textPrimary)
-
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(ApocalypseTheme.textSecondary)
-                }
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(ApocalypseTheme.textPrimary)
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
+                    .font(.caption)
                     .foregroundColor(ApocalypseTheme.textMuted)
             }
-            .padding()
-            .background(ApocalypseTheme.cardBackground)
-            .cornerRadius(12)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
     }
 }

@@ -22,6 +22,9 @@ class AuthManager: ObservableObject {
     /// 当前用户
     @Published var currentUser: User? = nil
 
+    /// 当前用户邮箱
+    @Published var currentUserEmail: String? = nil
+
     /// 加载状态
     @Published var isLoading: Bool = false
 
@@ -62,6 +65,9 @@ class AuthManager: ObservableObject {
         do {
             let session = try await supabase.auth.session
 
+            // 获取用户邮箱
+            currentUserEmail = session.user.email
+
             // 获取用户资料
             if let user = try? await fetchUserProfile(userId: session.user.id) {
                 currentUser = user
@@ -72,6 +78,7 @@ class AuthManager: ObservableObject {
             // 没有会话，保持未登录状态
             isAuthenticated = false
             currentUser = nil
+            currentUserEmail = nil
         }
     }
 
@@ -88,6 +95,7 @@ class AuthManager: ObservableObject {
                         if let user = try? await fetchUserProfile(userId: userId) {
                             await MainActor.run {
                                 currentUser = user
+                                currentUserEmail = state.session?.user.email
                                 isAuthenticated = true
                                 needsPasswordSetup = false
                             }
@@ -99,6 +107,7 @@ class AuthManager: ObservableObject {
                     await MainActor.run {
                         isAuthenticated = false
                         currentUser = nil
+                        currentUserEmail = nil
                         needsPasswordSetup = false
                         otpSent = false
                         otpVerified = false

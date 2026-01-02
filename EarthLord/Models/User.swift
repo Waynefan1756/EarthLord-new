@@ -11,12 +11,14 @@ import Foundation
 struct User: Codable, Identifiable {
     let id: UUID
     let username: String
+    let email: String?
     let avatarUrl: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id
         case username
+        case email
         case avatarUrl = "avatar_url"
         case createdAt = "created_at"
     }
