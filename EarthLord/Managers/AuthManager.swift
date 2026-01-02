@@ -37,6 +37,9 @@ class AuthManager: ObservableObject {
     /// 验证码已验证（等待设置密码）
     @Published var otpVerified: Bool = false
 
+    /// 正在重置密码流程中
+    @Published var isResettingPassword: Bool = false
+
     // MARK: - Private Properties
 
     private let supabase: SupabaseClient
@@ -96,8 +99,12 @@ class AuthManager: ObservableObject {
                             await MainActor.run {
                                 currentUser = user
                                 currentUserEmail = state.session?.user.email
-                                isAuthenticated = true
-                                needsPasswordSetup = false
+
+                                // 如果正在重置密码流程中，不设置为已认证
+                                if !isResettingPassword {
+                                    isAuthenticated = true
+                                    needsPasswordSetup = false
+                                }
                             }
                         }
                     }
@@ -111,6 +118,7 @@ class AuthManager: ObservableObject {
                         needsPasswordSetup = false
                         otpSent = false
                         otpVerified = false
+                        isResettingPassword = false
                     }
 
                 case .tokenRefreshed:
@@ -295,11 +303,13 @@ class AuthManager: ObservableObject {
             )
 
             otpVerified = true
-            isAuthenticated = false  // 需要设置新密码才算完成
+            isResettingPassword = true  // 标记正在重置密码
+            isAuthenticated = false     // 需要设置新密码才算完成
 
         } catch {
             errorMessage = "验证码错误或已过期：\(error.localizedDescription)"
             otpVerified = false
+            isResettingPassword = false
         }
 
         isLoading = false
@@ -324,6 +334,7 @@ class AuthManager: ObservableObject {
             }
 
             // 完成密码重置
+            isResettingPassword = false  // 重置密码流程完成
             isAuthenticated = true
             otpVerified = false
             otpSent = false
@@ -350,6 +361,7 @@ class AuthManager: ObservableObject {
             currentUser = nil
             otpSent = false
             otpVerified = false
+            isResettingPassword = false
 
         } catch {
             errorMessage = "退出登录失败：\(error.localizedDescription)"
