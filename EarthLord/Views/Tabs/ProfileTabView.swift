@@ -130,6 +130,16 @@ struct ProfileTabView: View {
             }
             .navigationTitle("个人")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showLogoutConfirm = true
+                    }) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(ApocalypseTheme.danger)
+                    }
+                }
+            }
             .confirmationDialog(
                 "确定要退出登录吗？",
                 isPresented: $showLogoutConfirm,
