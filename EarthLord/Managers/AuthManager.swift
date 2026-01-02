@@ -37,6 +37,7 @@ class AuthManager: ObservableObject {
     // MARK: - Private Properties
 
     private let supabase: SupabaseClient
+    private var authStateTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -46,13 +47,18 @@ class AuthManager: ObservableObject {
         // 检查当前会话状态
         Task {
             await checkSession()
+            await listenToAuthStateChanges()
         }
+    }
+
+    deinit {
+        authStateTask?.cancel()
     }
 
     // MARK: - Session Management
 
     /// 检查当前会话
-    private func checkSession() async {
+    func checkSession() async {
         do {
             let session = try await supabase.auth.session
 
@@ -66,6 +72,60 @@ class AuthManager: ObservableObject {
             // 没有会话，保持未登录状态
             isAuthenticated = false
             currentUser = nil
+        }
+    }
+
+    /// 监听认证状态变化
+    private func listenToAuthStateChanges() async {
+        authStateTask = Task {
+            for await state in await supabase.auth.authStateChanges {
+                guard !Task.isCancelled else { return }
+
+                switch state.event {
+                case .signedIn:
+                    // 用户登录
+                    if let userId = state.session?.user.id {
+                        if let user = try? await fetchUserProfile(userId: userId) {
+                            await MainActor.run {
+                                currentUser = user
+                                isAuthenticated = true
+                                needsPasswordSetup = false
+                            }
+                        }
+                    }
+
+                case .signedOut:
+                    // 用户登出
+                    await MainActor.run {
+                        isAuthenticated = false
+                        currentUser = nil
+                        needsPasswordSetup = false
+                        otpSent = false
+                        otpVerified = false
+                    }
+
+                case .tokenRefreshed:
+                    // Token 刷新，保持当前状态
+                    break
+
+                case .passwordRecovery:
+                    // 密码恢复
+                    break
+
+                case .userUpdated:
+                    // 用户信息更新
+                    if let userId = state.session?.user.id {
+                        if let user = try? await fetchUserProfile(userId: userId) {
+                            await MainActor.run {
+                                currentUser = user
+                            }
+                        }
+                    }
+
+                default:
+                    break
+                }
+            }
         }
     }
 
