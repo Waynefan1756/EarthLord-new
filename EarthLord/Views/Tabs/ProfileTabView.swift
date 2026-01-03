@@ -10,6 +10,7 @@ import SwiftUI
 struct ProfileTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var showLogoutConfirm = false
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -96,7 +97,7 @@ struct ProfileTabView: View {
                                     iconColor: .gray,
                                     title: "设置"
                                 ) {
-                                    // TODO: 跳转到设置页
+                                    showSettings = true
                                 }
 
                                 Divider()
@@ -176,6 +177,10 @@ struct ProfileTabView: View {
                     }
                 }
                 Button("取消", role: .cancel) {}
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+                    .environmentObject(authManager)
             }
         }
     }
