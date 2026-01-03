@@ -16,9 +16,22 @@
 		581C5EE72F07099400C4C803 /* EarthLord.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EarthLord.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		581C5EEA2F07099400C4C804 /* Exceptions for "EarthLord" */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 581C5EE62F07099400C4C803 /* EarthLord */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		581C5EE92F07099400C4C803 /* EarthLord */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				581C5EEA2F07099400C4C804 /* Exceptions for "EarthLord" */,
+			);
 			path = EarthLord;
 			sourceTree = "<group>";
 		};
