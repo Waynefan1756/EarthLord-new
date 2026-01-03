@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProfileTabView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var languageManager: LanguageManager
     @State private var showLogoutConfirm = false
     @State private var showSettings = false
 
@@ -181,6 +182,7 @@ struct ProfileTabView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environmentObject(authManager)
+                    .environmentObject(languageManager)
             }
         }
     }
@@ -189,7 +191,7 @@ struct ProfileTabView: View {
 // MARK: - 统计卡片
 
 struct StatCard: View {
-    let title: String
+    let title: LocalizedStringKey  // 改为 LocalizedStringKey
     let value: String
     let icon: String
 
@@ -218,7 +220,7 @@ struct StatCard: View {
 struct MenuButton: View {
     let icon: String
     let iconColor: Color
-    let title: String
+    let title: LocalizedStringKey  // 改为 LocalizedStringKey
     let action: () -> Void
 
     var body: some View {

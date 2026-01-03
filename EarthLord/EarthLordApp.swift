@@ -12,6 +12,9 @@ struct EarthLordApp: App {
     /// 认证管理器
     @StateObject private var authManager = AuthManager(supabase: supabase)
 
+    /// 语言管理器
+    @StateObject private var languageManager = LanguageManager.shared
+
     /// 启动页是否完成
     @State private var splashFinished = false
 
@@ -30,10 +33,12 @@ struct EarthLordApp: App {
                     MainTabView()
                         .transition(.opacity)
                         .environmentObject(authManager)
+                        .environmentObject(languageManager)
                 } else {
                     // 3️⃣ 未登录 → 认证页
                     AuthView(authManager: authManager)
                         .transition(.opacity)
+                        .environmentObject(languageManager)
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: splashFinished)

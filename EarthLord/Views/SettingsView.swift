@@ -10,6 +10,7 @@ import SwiftUI
 /// 设置页面
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var languageManager: LanguageManager
     @Environment(\.dismiss) var dismiss
 
     @State private var showDeleteConfirm = false
@@ -40,7 +41,7 @@ struct SettingsView: View {
                                         icon: "envelope.fill",
                                         iconColor: .blue,
                                         title: "邮箱",
-                                        value: authManager.currentUserEmail ?? "未设置"
+                                        value: authManager.currentUserEmail ?? NSLocalizedString("未设置", comment: "")
                                     )
 
                                     Divider()
@@ -83,14 +84,30 @@ struct SettingsView: View {
                                     Divider()
                                         .padding(.leading, 60)
 
-                                    SettingsRow(
-                                        icon: "globe",
-                                        iconColor: .green,
-                                        title: "语言",
-                                        value: "简体中文",
-                                        showChevron: true
-                                    ) {
-                                        // TODO: 跳转到语言设置页面
+                                    NavigationLink(destination: LanguageSelectionView()) {
+                                        HStack(spacing: 16) {
+                                            Image(systemName: "globe")
+                                                .font(.title3)
+                                                .foregroundColor(.green)
+                                                .frame(width: 24)
+
+                                            Text("语言")
+                                                .font(.body)
+                                                .foregroundColor(ApocalypseTheme.textPrimary)
+
+                                            Spacer()
+
+                                            Text(languageManager.currentLanguageDisplayText)
+                                                .font(.subheadline)
+                                                .foregroundColor(ApocalypseTheme.textSecondary)
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundColor(ApocalypseTheme.textMuted)
+                                        }
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 16)
+                                        .contentShape(Rectangle())
                                     }
                                 }
                                 .background(ApocalypseTheme.cardBackground)
@@ -250,8 +267,8 @@ struct SettingsView: View {
 struct SettingsRow: View {
     let icon: String
     let iconColor: Color
-    let title: String
-    var value: String?
+    let title: LocalizedStringKey  // 改为 LocalizedStringKey
+    var value: String?  // 保持 String，用于显示动态内容（如邮箱地址）
     var showChevron: Bool = false
     var action: (() -> Void)?
 
@@ -298,6 +315,9 @@ struct DeleteAccountConfirmView: View {
     @Binding var confirmText: String
     let onConfirm: () -> Void
 
+    // 本地化的"删除"文本
+    private let deleteKeyword = NSLocalizedString("删除", comment: "")
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -337,7 +357,7 @@ struct DeleteAccountConfirmView: View {
 
                     // 确认输入
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("请输入\"删除\"以确认")
+                        Text("请输入\"\(deleteKeyword)\"以确认")
                             .font(.subheadline)
                             .foregroundColor(ApocalypseTheme.textSecondary)
 
@@ -370,10 +390,10 @@ struct DeleteAccountConfirmView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(confirmText == "删除" ? ApocalypseTheme.danger : ApocalypseTheme.danger.opacity(0.5))
+                                .background(confirmText == deleteKeyword ? ApocalypseTheme.danger : ApocalypseTheme.danger.opacity(0.5))
                                 .cornerRadius(12)
                         }
-                        .disabled(confirmText != "删除")
+                        .disabled(confirmText != deleteKeyword)
 
                         Button(action: {
                             confirmText = ""
@@ -400,4 +420,5 @@ struct DeleteAccountConfirmView: View {
 #Preview {
     SettingsView()
         .environmentObject(AuthManager(supabase: supabase))
+        .environmentObject(LanguageManager.shared)
 }

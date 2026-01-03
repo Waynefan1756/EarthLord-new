@@ -282,7 +282,11 @@ class AuthManager: ObservableObject {
         otpSent = false
 
         do {
-            try await supabase.auth.resetPasswordForEmail(email)
+            // 使用 OTP 方式发送验证码（而不是重置链接）
+            try await supabase.auth.signInWithOTP(
+                email: email,
+                redirectTo: nil
+            )
             otpSent = true
         } catch {
             errorMessage = "发送重置密码验证码失败：\(error.localizedDescription)"
@@ -300,7 +304,7 @@ class AuthManager: ObservableObject {
             _ = try await supabase.auth.verifyOTP(
                 email: email,
                 token: otp,
-                type: .recovery  // 重置密码使用 recovery 类型
+                type: .email  // 使用 email 类型（与 signInWithOTP 对应）
             )
 
             otpVerified = true
