@@ -16,9 +16,22 @@
 		581C5EE72F07099400C4C803 /* EarthLord.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EarthLord.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		582C79E12F094F4F004EAD3B /* Exceptions for "EarthLord" folder in "EarthLord" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 581C5EE62F07099400C4C803 /* EarthLord */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		581C5EE92F07099400C4C803 /* EarthLord */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				582C79E12F094F4F004EAD3B /* Exceptions for "EarthLord" folder in "EarthLord" target */,
+			);
 			path = EarthLord;
 			sourceTree = "<group>";
 		};
@@ -64,7 +77,6 @@
 				581C5EE32F07099400C4C803 /* Sources */,
 				581C5EE42F07099400C4C803 /* Frameworks */,
 				581C5EE52F07099400C4C803 /* Resources */,
-				999999992F07099400C4C805 /* Inject Google URL Schemes */,
 			);
 			buildRules = (
 			);
@@ -130,28 +142,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		999999992F07099400C4C805 /* Inject Google URL Schemes */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Inject Google URL Schemes";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -e\nset -x\n\necho \"🔍 Script started\"\necho \"TARGET_BUILD_DIR: ${TARGET_BUILD_DIR}\"\necho \"INFOPLIST_PATH: ${INFOPLIST_PATH}\"\necho \"BUILT_PRODUCTS_DIR: ${BUILT_PRODUCTS_DIR}\"\n\n# Try multiple possible paths\nINFO_PLIST_1=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\nINFO_PLIST_2=\"${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}\"\nINFO_PLIST_3=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Info.plist\"\n\necho \"Trying path 1: $INFO_PLIST_1\"\necho \"Trying path 2: $INFO_PLIST_2\"\necho \"Trying path 3: $INFO_PLIST_3\"\n\n# Find the correct Info.plist\nINFO_PLIST=\"\"\nif [ -f \"$INFO_PLIST_1\" ]; then\n    INFO_PLIST=\"$INFO_PLIST_1\"\n    echo \"✅ Found at path 1\"\nelif [ -f \"$INFO_PLIST_2\" ]; then\n    INFO_PLIST=\"$INFO_PLIST_2\"\n    echo \"✅ Found at path 2\"\nelif [ -f \"$INFO_PLIST_3\" ]; then\n    INFO_PLIST=\"$INFO_PLIST_3\"\n    echo \"✅ Found at path 3\"\nelse\n    echo \"❌ Info.plist not found at any path!\"\n    ls -la \"${BUILT_PRODUCTS_DIR}/\" || true\n    exit 1\nfi\n\necho \"📝 Using Info.plist at: $INFO_PLIST\"\n\n# Add URL Schemes\necho \"🔧 Adding URL Schemes...\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes array\" \"$INFO_PLIST\" 2>&1 || echo \"Array exists\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0 dict\" \"$INFO_PLIST\" 2>&1 || echo \"Dict exists\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleTypeRole string Editor\" \"$INFO_PLIST\" 2>&1 || echo \"Role exists\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLName string com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\" \"$INFO_PLIST\" 2>&1 || echo \"URLName exists\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes array\" \"$INFO_PLIST\" 2>&1 || echo \"Schemes array exists\"\n/usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\" \"$INFO_PLIST\" 2>&1 || echo \"Scheme exists\"\n\necho \"🎉 URL Schemes injection complete!\"\n\n# Verify\necho \"📋 Verification:\"\n/usr/libexec/PlistBuddy -c \"Print CFBundleURLTypes\" \"$INFO_PLIST\" || echo \"Failed to verify\"\n";
-			showEnvVarsInLog = 1;
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		581C5EE32F07099400C4C803 /* Sources */ = {
@@ -294,8 +284,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 53QFD7DMZW;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\"\n    );\n}";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = EarthLord/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -327,8 +317,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 53QFD7DMZW;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\"\n    );\n}";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = EarthLord/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
