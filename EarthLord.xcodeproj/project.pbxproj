@@ -64,6 +64,7 @@
 				581C5EE32F07099400C4C803 /* Sources */,
 				581C5EE42F07099400C4C803 /* Frameworks */,
 				581C5EE52F07099400C4C803 /* Resources */,
+				999999992F07099400C4C803 /* Add Google URL Scheme */,
 			);
 			buildRules = (
 			);
