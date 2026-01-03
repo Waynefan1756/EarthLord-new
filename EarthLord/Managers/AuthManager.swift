@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import Supabase
+import GoogleSignIn
 
 @MainActor
 class AuthManager: ObservableObject {
@@ -459,8 +460,81 @@ class AuthManager: ObservableObject {
         errorMessage = "Apple 登录功能开发中..."
     }
 
-    /// Google 登录（待实现）
+    /// Google 登录
     func signInWithGoogle() async {
-        errorMessage = "Google 登录功能开发中..."
+        print("🔐 开始 Google 登录流程...")
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // 获取根视图控制器
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let rootViewController = windowScene.windows.first?.rootViewController else {
+                print("❌ 无法获取根视图控制器")
+                throw NSError(domain: "GoogleSignIn", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法获取视图控制器"])
+            }
+            print("✅ 成功获取根视图控制器")
+
+            // 配置 Google 登录
+            let clientID = "978524027700-8rej32bbb1otn10mis79nc9q0su0u069.apps.googleusercontent.com"
+            let config = GIDConfiguration(clientID: clientID)
+            GIDSignIn.sharedInstance.configuration = config
+            print("✅ Google 登录配置完成，Client ID: \(clientID)")
+
+            // 执行 Google 登录
+            print("📱 启动 Google 登录界面...")
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+
+            guard let idToken = result.user.idToken?.tokenString else {
+                print("❌ 无法获取 ID Token")
+                throw NSError(domain: "GoogleSignIn", code: -2, userInfo: [NSLocalizedDescriptionKey: "无法获取 Google ID Token"])
+            }
+            print("✅ 成功获取 Google ID Token")
+
+            let accessToken = result.user.accessToken.tokenString
+            print("✅ 成功获取 Google Access Token")
+
+            // 使用 Google ID Token 登录 Supabase
+            print("🔄 使用 Google 令牌登录 Supabase...")
+            let session = try await supabase.auth.signInWithIdToken(
+                credentials: .init(
+                    provider: .google,
+                    idToken: idToken,
+                    accessToken: accessToken
+                )
+            )
+            print("✅ Supabase 登录成功")
+
+            // 获取用户邮箱
+            currentUserEmail = session.user.email
+            print("📧 用户邮箱: \(currentUserEmail ?? "未设置")")
+
+            // 获取或创建用户资料
+            if let user = try? await fetchUserProfile(userId: session.user.id) {
+                print("✅ 成功获取用户资料")
+                currentUser = user
+            } else {
+                print("⚠️ 用户资料不存在，可能需要创建")
+                // 如果 profiles 表中没有记录，这里可以选择创建
+            }
+
+            // 设置认证状态
+            isAuthenticated = true
+            needsPasswordSetup = false
+            print("🎉 Google 登录流程完成")
+
+        } catch let error as NSError {
+            print("❌ Google 登录失败: \(error.localizedDescription)")
+            if error.domain == "com.google.GIDSignIn" && error.code == -5 {
+                // 用户取消登录
+                errorMessage = "已取消 Google 登录"
+                print("ℹ️ 用户取消了登录")
+            } else {
+                errorMessage = "Google 登录失败：\(error.localizedDescription)"
+            }
+            isAuthenticated = false
+        }
+
+        isLoading = false
     }
 }
