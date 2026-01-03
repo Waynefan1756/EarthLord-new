@@ -16,22 +16,9 @@
 		581C5EE72F07099400C4C803 /* EarthLord.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EarthLord.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		581C5EEA2F07099400C4C804 /* Exceptions for "EarthLord" */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 581C5EE62F07099400C4C803 /* EarthLord */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		581C5EE92F07099400C4C803 /* EarthLord */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				581C5EEA2F07099400C4C804 /* Exceptions for "EarthLord" */,
-			);
 			path = EarthLord;
 			sourceTree = "<group>";
 		};
@@ -284,8 +271,16 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 53QFD7DMZW;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = EarthLord/Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = (
+					{
+						CFBundleTypeRole = Editor;
+						CFBundleURLName = "com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069";
+						CFBundleURLSchemes = (
+							"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069",
+						);
+					},
+				);
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -317,8 +312,16 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 53QFD7DMZW;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = EarthLord/Info.plist;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = (
+					{
+						CFBundleTypeRole = Editor;
+						CFBundleURLName = "com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069";
+						CFBundleURLSchemes = (
+							"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069",
+						);
+					},
+				);
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
