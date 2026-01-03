@@ -63,6 +63,7 @@
 			buildPhases = (
 				581C5EE32F07099400C4C803 /* Sources */,
 				581C5EE42F07099400C4C803 /* Frameworks */,
+				999999992F07099400C4C805 /* Inject Google URL Schemes */,
 				581C5EE52F07099400C4C803 /* Resources */,
 			);
 			buildRules = (
@@ -129,6 +130,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		999999992F07099400C4C805 /* Inject Google URL Schemes */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Inject Google URL Schemes";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Create temporary plist with URL Schemes\ncat > /tmp/url_schemes.plist <<'EOF'\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>CFBundleURLTypes</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleTypeRole</key>\n\t\t\t<string>Editor</string>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069</string>\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069</string>\n\t\t\t</array>\n\t\t</dict>\n\t</array>\n</dict>\n</plist>\nEOF\n\n# Merge URL Schemes into generated Info.plist using PlistBuddy\nINFO_PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\nif [ -f \"$INFO_PLIST\" ]; then\n    echo \"✅ Found Info.plist at: $INFO_PLIST\"\n    /usr/libexec/PlistBuddy -x -c 'Merge /tmp/url_schemes.plist' \"$INFO_PLIST\" 2>&1 || echo \"⚠️ Failed to merge, trying manual add...\"\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes array\" \"$INFO_PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0 dict\" \"$INFO_PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleTypeRole string Editor\" \"$INFO_PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLName string com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\" \"$INFO_PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes array\" \"$INFO_PLIST\" 2>/dev/null || true\n    /usr/libexec/PlistBuddy -c \"Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\" \"$INFO_PLIST\" 2>/dev/null || true\n    echo \"✅ URL Schemes injected\"\nelse\n    echo \"❌ Info.plist not found at: $INFO_PLIST\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		581C5EE32F07099400C4C803 /* Sources */ = {
@@ -272,15 +295,7 @@
 				DEVELOPMENT_TEAM = 53QFD7DMZW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLName = "com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069";
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069",
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\"\n    );\n}";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -313,15 +328,7 @@
 				DEVELOPMENT_TEAM = 53QFD7DMZW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLName = "com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069";
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069",
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLName = \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.978524027700-8rej32bbb1otn10mis79nc9q0su0u069\"\n    );\n}";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
