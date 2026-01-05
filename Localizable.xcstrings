@@ -17,6 +17,9 @@
         }
       }
     },
+    "%lld 个点" : {
+
+    },
     "Developed by Wayne" : {
       "localizations" : {
         "en" : {
@@ -193,6 +196,12 @@
         }
       }
     },
+    "停止圈地" : {
+
+    },
+    "允许《地球新主》访问您的位置\n才能显示您在末日世界中的坐标" : {
+
+    },
     "关于" : {
       "localizations" : {
         "en" : {
@@ -240,6 +249,9 @@
           }
         }
       }
+    },
+    "前往设置" : {
+
     },
     "加载中..." : {
       "localizations" : {
@@ -321,6 +333,16 @@
         }
       }
     },
+    "坐标: %@, %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "坐标: %1$@, %2$@"
+          }
+        }
+      }
+    },
     "完成" : {
       "localizations" : {
         "en" : {
@@ -352,6 +374,12 @@
           }
         }
       }
+    },
+    "定位中..." : {
+
+    },
+    "定位权限被拒绝" : {
+
     },
     "密码不匹配" : {
       "localizations" : {
@@ -401,6 +429,22 @@
         }
       }
     },
+    "帮助" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帮助"
+          }
+        }
+      }
+    },
     "幸存者档案" : {
       "localizations" : {
         "en" : {
@@ -416,6 +460,9 @@
           }
         }
       }
+    },
+    "开始圈地" : {
+
     },
     "忘记密码" : {
       "localizations" : {
@@ -466,6 +513,7 @@
       }
     },
     "探索和圈占领地" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -477,6 +525,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "探索和圈占领地"
+          }
+        }
+      }
+    },
+    "探索距离" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "探索距离"
           }
         }
       }
@@ -785,6 +849,12 @@
         }
       }
     },
+    "请在系统设置中允许定位" : {
+
+    },
+    "请求定位权限" : {
+
+    },
     "请设置您的登录密码" : {
       "localizations" : {
         "en" : {
@@ -869,6 +939,22 @@
         }
       }
     },
+    "资源点" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resources"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资源点"
+          }
+        }
+      }
+    },
     "跟随系统" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -946,6 +1032,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通用设置"
+          }
+        }
+      }
+    },
+    "通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
           }
         }
       }
@@ -1046,6 +1148,9 @@
         }
       }
     },
+    "需要定位权限" : {
+
+    },
     "领地" : {
       "localizations" : {
         "en" : {
@@ -1090,70 +1195,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "验证码已发送至 %@"
-          }
-        }
-      }
-    },
-    "资源点" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resources"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "资源点"
-          }
-        }
-      }
-    },
-    "探索距离" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distance"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索距离"
-          }
-        }
-      }
-    },
-    "帮助" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Help"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "帮助"
-          }
-        }
-      }
-    },
-    "通知" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notifications"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知"
           }
         }
       }
