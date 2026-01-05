@@ -12,8 +12,8 @@ struct MapTabView: View {
 
     // MARK: - Properties
 
-    /// 定位管理器
-    @StateObject private var locationManager = LocationManager()
+    /// 定位管理器（从 App 注入的全局实例）
+    @EnvironmentObject var locationManager: LocationManager
 
     /// 是否已完成首次定位
     @State private var hasLocatedUser = false

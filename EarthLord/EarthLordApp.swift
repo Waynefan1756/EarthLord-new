@@ -15,6 +15,9 @@ struct EarthLordApp: App {
     /// 语言管理器
     @StateObject private var languageManager = LanguageManager.shared
 
+    /// 定位管理器（全局共享）
+    @StateObject private var locationManager = LocationManager()
+
     /// 启动页是否完成
     @State private var splashFinished = false
 
@@ -34,6 +37,7 @@ struct EarthLordApp: App {
                         .transition(.opacity)
                         .environmentObject(authManager)
                         .environmentObject(languageManager)
+                        .environmentObject(locationManager)
                 } else {
                     // 3️⃣ 未登录 → 认证页
                     AuthView(authManager: authManager)

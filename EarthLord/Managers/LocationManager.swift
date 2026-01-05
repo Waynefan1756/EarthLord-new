@@ -137,6 +137,7 @@ class LocationManager: NSObject, ObservableObject {
         }
 
         print("✅ 开始圈地追踪")
+        TerritoryLogger.shared.log("开始圈地追踪", type: .info)
     }
 
     /// 停止路径追踪
@@ -148,6 +149,7 @@ class LocationManager: NSObject, ObservableObject {
         pathUpdateTimer = nil
 
         print("⏹️ 停止圈地追踪，共记录 \(pathCoordinates.count) 个点")
+        TerritoryLogger.shared.log("停止追踪，共 \(pathCoordinates.count) 个点", type: .info)
     }
 
     /// 清除路径
@@ -178,6 +180,7 @@ class LocationManager: NSObject, ObservableObject {
             pathUpdateVersion += 1
             lastLocationTimestamp = Date()
             print("📍 记录第 1 个点：\(location.coordinate.latitude), \(location.coordinate.longitude)")
+            TerritoryLogger.shared.log("记录第 1 个点", type: .info)
             return
         }
 
@@ -192,6 +195,7 @@ class LocationManager: NSObject, ObservableObject {
             pathUpdateVersion += 1
             lastLocationTimestamp = Date()
             print("📍 记录第 \(pathCoordinates.count) 个点，距离上个点 \(String(format: "%.1f", distance)) 米")
+            TerritoryLogger.shared.log("记录第 \(pathCoordinates.count) 个点，距上点 \(String(format: "%.1f", distance))m", type: .info)
 
             // ⭐ 检查是否形成闭环
             checkPathClosure()
@@ -225,8 +229,10 @@ class LocationManager: NSObject, ObservableObject {
             isPathClosed = true
             pathUpdateVersion += 1
             print("✅ 闭环检测成功！起点到终点距离：\(String(format: "%.1f", distance)) 米")
+            TerritoryLogger.shared.log("闭环成功！距起点 \(String(format: "%.1f", distance))m", type: .success)
         } else {
             print("⚪ 闭环检测：距离起点 \(String(format: "%.1f", distance)) 米（需要 ≤ \(closureDistanceThreshold) 米）")
+            TerritoryLogger.shared.log("距起点 \(String(format: "%.1f", distance))m (需≤30m)", type: .info)
         }
     }
 
@@ -261,6 +267,7 @@ class LocationManager: NSObject, ObservableObject {
             // 超过 30 km/h，暂停追踪
             speedWarning = "速度过快（\(String(format: "%.1f", speedKmPerHour)) km/h），已暂停圈地"
             isOverSpeed = true
+            TerritoryLogger.shared.log("超速 \(String(format: "%.1f", speedKmPerHour)) km/h，已停止追踪", type: .error)
             stopPathTracking()
             print("🚫 速度过快（\(String(format: "%.1f", speedKmPerHour)) km/h），已暂停圈地")
             return false
@@ -269,6 +276,7 @@ class LocationManager: NSObject, ObservableObject {
             speedWarning = "速度较快（\(String(format: "%.1f", speedKmPerHour)) km/h），请减速"
             isOverSpeed = true
             print("⚠️ 速度警告（\(String(format: "%.1f", speedKmPerHour)) km/h）")
+            TerritoryLogger.shared.log("速度较快 \(String(format: "%.1f", speedKmPerHour)) km/h", type: .warning)
             return true
         } else {
             // 速度正常
