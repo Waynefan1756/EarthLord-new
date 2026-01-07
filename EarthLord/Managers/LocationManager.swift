@@ -169,6 +169,14 @@ class LocationManager: NSObject, ObservableObject {
 
         print("⏹️ 停止圈地追踪，共记录 \(pathCoordinates.count) 个点")
         TerritoryLogger.shared.log("停止追踪，共 \(pathCoordinates.count) 个点", type: .info)
+
+        // ⚠️ 重置所有状态（防止重复上传）
+        territoryValidationPassed = false
+        territoryValidationError = nil
+        calculatedArea = 0
+        pathCoordinates.removeAll()
+        pathUpdateVersion += 1
+        isPathClosed = false
     }
 
     /// 清除路径
