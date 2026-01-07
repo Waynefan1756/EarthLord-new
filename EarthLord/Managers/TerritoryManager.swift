@@ -167,4 +167,46 @@ class TerritoryManager {
         print("✅ 成功加载 \(territories.count) 个领地")
         return territories
     }
+
+    /// 加载我的领地
+    /// - Returns: 我的领地数组
+    /// - Throws: 加载失败时抛出错误
+    func loadMyTerritories() async throws -> [Territory] {
+        guard let userId = try? await supabase.auth.session.user.id else {
+            throw NSError(domain: "TerritoryManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "未登录"])
+        }
+
+        let territories: [Territory] = try await supabase
+            .from("territories")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("is_active", value: true)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
+        print("✅ 成功加载我的 \(territories.count) 个领地")
+        return territories
+    }
+
+    /// 删除领地
+    /// - Parameter territoryId: 领地 ID
+    /// - Returns: 是否删除成功
+    func deleteTerritory(territoryId: String) async -> Bool {
+        do {
+            try await supabase
+                .from("territories")
+                .delete()
+                .eq("id", value: territoryId)
+                .execute()
+
+            print("✅ 成功删除领地：\(territoryId)")
+            TerritoryLogger.shared.log("删除领地成功", type: .success)
+            return true
+        } catch {
+            print("❌ 删除领地失败：\(error.localizedDescription)")
+            TerritoryLogger.shared.log("删除领地失败: \(error.localizedDescription)", type: .error)
+            return false
+        }
+    }
 }
