@@ -45,8 +45,10 @@ struct EarthLordApp: App {
                         .environmentObject(languageManager)
                 }
             }
+            .environment(\.locale, languageManager.currentLocale)
             .animation(.easeInOut(duration: 0.3), value: splashFinished)
             .animation(.easeInOut(duration: 0.3), value: authManager.isAuthenticated)
+            .id(languageManager.currentLocale.identifier)
         }
     }
 }

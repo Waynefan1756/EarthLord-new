@@ -90,6 +90,9 @@
         }
       }
     },
+    "Language Settings" : {
+
+    },
     "mlxrahhsuulzrssjtafq.supabase.co" : {
       "localizations" : {
         "en" : {
@@ -632,6 +635,7 @@
       }
     },
     "未设置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -911,6 +915,7 @@
       }
     },
     "语言设置" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

@@ -53,6 +53,9 @@ class LanguageManager: ObservableObject {
     /// 当前实际使用的语言代码
     @Published var currentLanguageCode: String = ""
 
+    /// 当前 Locale（用于 SwiftUI 环境）
+    @Published var currentLocale: Locale = .current
+
     private let languageKey = "app_language"
     private var cancellables = Set<AnyCancellable>()
 
@@ -104,12 +107,8 @@ class LanguageManager: ObservableObject {
 
         currentLanguageCode = languageCode
 
-        // 设置 Bundle 的本地化语言
-        Bundle.setLanguage(languageCode)
-
-        // 设置 UserDefaults 的 AppleLanguages
-        UserDefaults.standard.set([languageCode], forKey: "AppleLanguages")
-        UserDefaults.standard.synchronize()
+        // ⭐ 更新 Locale 以触发 SwiftUI 视图刷新
+        currentLocale = Locale(identifier: languageCode)
 
         print("🌐 语言已切换至: \(currentLanguage.displayName) (\(languageCode))")
 
@@ -134,45 +133,6 @@ class LanguageManager: ObservableObject {
         case .english:
             return "English"
         }
-    }
-}
-
-/// 扩展 Bundle 以支持动态语言切换
-extension Bundle {
-    private static var bundleKey: UInt8 = 0
-    private static var hasSwizzled = false
-
-    /// 获取本地化 Bundle
-    static var localizedBundle: Bundle? {
-        objc_getAssociatedObject(Bundle.main, &bundleKey) as? Bundle
-    }
-
-    /// 设置本地化 Bundle
-    static func setLanguage(_ languageCode: String) {
-        // 只在第一次调用时进行 swizzling
-        if !hasSwizzled {
-            object_setClass(Bundle.main, PrivateBundle.self)
-            hasSwizzled = true
-        }
-
-        if let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
-           let bundle = Bundle(path: path) {
-            objc_setAssociatedObject(Bundle.main, &bundleKey, bundle, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        } else {
-            // 如果找不到对应语言包，移除关联对象
-            objc_setAssociatedObject(Bundle.main, &bundleKey, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        }
-    }
-}
-
-private class PrivateBundle: Bundle {
-    override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
-        // 如果有自定义的语言 Bundle，使用它
-        if let bundle = Bundle.localizedBundle {
-            return bundle.localizedString(forKey: key, value: value, table: tableName)
-        }
-        // 否则使用父类的实现（避免无限递归）
-        return super.localizedString(forKey: key, value: value, table: tableName)
     }
 }
 
