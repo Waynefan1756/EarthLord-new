@@ -86,6 +86,17 @@ class LocationManager: NSObject, ObservableObject {
     /// 上次位置时间戳（用于计算速度）
     private var lastLocationTimestamp: Date?
 
+    // MARK: - GPS Quality Monitoring
+
+    /// GPS信号质量（0-100，0=最差，100=最好）
+    @Published var gpsSignalQuality: Int = 100
+
+    /// GPS漂移连续次数（用于检测持续的信号问题）
+    private var consecutiveGpsDriftCount: Int = 0
+
+    /// 最大允许连续漂移次数
+    private let maxConsecutiveDrifts: Int = 5
+
     // MARK: - Computed Properties
 
     /// 是否已授权定位
@@ -150,6 +161,12 @@ class LocationManager: NSObject, ObservableObject {
         pathCoordinates.removeAll()
         pathUpdateVersion += 1
 
+        // ⭐ 重置GPS监控状态
+        consecutiveGpsDriftCount = 0
+        gpsSignalQuality = 100
+        speedWarning = nil
+        isOverSpeed = false
+
         // 启动定时器（每 2 秒检查一次）
         pathUpdateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.recordPathPoint()
@@ -195,9 +212,15 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
 
+        // ⭐ GPS 精度检查：过滤精度太差的点
+        if !validateGPSAccuracy(location) {
+            print("⚠️ GPS 精度太差，跳过该点")
+            return
+        }
+
         // ⭐ 速度检测：防止作弊
         if !validateMovementSpeed(newLocation: location) {
-            print("⚠️ 速度超标，跳过该点")
+            print("⚠️ 速度异常，跳过该点")
             return
         }
 
@@ -277,15 +300,75 @@ class LocationManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Speed Detection
+    // MARK: - GPS Accuracy & Speed Detection
 
-    /// 验证移动速度（防作弊）
+    /// GPS 精度检查
+    /// - Parameter location: 位置对象
+    /// - Returns: true = 精度可接受，false = 精度太差
+    private func validateGPSAccuracy(_ location: CLLocation) -> Bool {
+        // horizontalAccuracy < 0 表示无效定位
+        guard location.horizontalAccuracy >= 0 else {
+            print("⚠️ GPS 定位无效")
+            updateGPSQuality(0)
+            return false
+        }
+
+        // ⭐ 检查速度精度（iOS 提供的速度误差估计）
+        // speedAccuracy < 0 表示速度无效或不可用
+        let hasValidSpeed = location.speedAccuracy >= 0
+
+        // horizontalAccuracy 表示精度半径（米）
+        // 动态调整精度阈值：如果有有效的速度数据，可以放宽位置精度要求
+        let accuracyThreshold: Double = hasValidSpeed ? 40 : 30
+
+        if location.horizontalAccuracy > accuracyThreshold {
+            print("⚠️ GPS 精度太差：±\(String(format: "%.1f", location.horizontalAccuracy))m，已忽略")
+            TerritoryLogger.shared.log("GPS精度差 ±\(String(format: "%.1f", location.horizontalAccuracy))m", type: .warning)
+
+            // 更新GPS信号质量（精度越差，质量越低）
+            let quality = max(0, Int((1 - location.horizontalAccuracy / 100) * 100))
+            updateGPSQuality(quality)
+
+            return false
+        }
+
+        // ⭐ 如果速度精度太差（误差 > 10 m/s），也标记为信号不佳
+        if hasValidSpeed && location.speedAccuracy > 10 {
+            print("⚠️ GPS 速度精度差：±\(String(format: "%.1f", location.speedAccuracy)) m/s")
+            TerritoryLogger.shared.log("GPS速度精度差 ±\(String(format: "%.1f", location.speedAccuracy))m/s", type: .warning)
+
+            let quality = max(0, Int((1 - location.speedAccuracy / 20) * 100))
+            updateGPSQuality(quality)
+
+            return false
+        }
+
+        // 精度良好，更新信号质量
+        let quality = max(50, Int((1 - location.horizontalAccuracy / 50) * 100))
+        updateGPSQuality(quality)
+
+        return true
+    }
+
+    /// 更新GPS信号质量指标
+    /// - Parameter quality: 信号质量 (0-100)
+    private func updateGPSQuality(_ quality: Int) {
+        let clampedQuality = min(100, max(0, quality))
+
+        DispatchQueue.main.async { [weak self] in
+            self?.gpsSignalQuality = clampedQuality
+        }
+    }
+
+    /// 验证移动速度（防作弊 + GPS漂移检测）
     /// - Parameter newLocation: 新位置
-    /// - Returns: true = 速度正常，false = 速度超标
+    /// - Returns: true = 速度正常，false = 速度异常（忽略该点）
     private func validateMovementSpeed(newLocation: CLLocation) -> Bool {
         // 第一个点，直接通过
         guard let lastTimestamp = lastLocationTimestamp,
               let lastCoordinate = pathCoordinates.last else {
+            // 重置漂移计数器
+            consecutiveGpsDriftCount = 0
             return true
         }
 
@@ -296,35 +379,76 @@ class LocationManager: NSObject, ObservableObject {
         // 计算时间差（秒）
         let timeInterval = Date().timeIntervalSince(lastTimestamp)
 
-        // 避免除零错误
-        guard timeInterval > 0 else { return true }
+        // ⚠️ 时间间隔太短时不计算速度（GPS 精度不够）
+        guard timeInterval >= 2.0 else {
+            print("⏱️ 时间间隔太短（\(String(format: "%.1f", timeInterval))秒），跳过速度检测")
+            return true
+        }
 
         // 计算速度（km/h）
         let speedMeterPerSecond = distance / timeInterval
         let speedKmPerHour = speedMeterPerSecond * 3.6
 
-        // 速度检测
-        if speedKmPerHour > 30 {
-            // 超过 30 km/h，暂停追踪
-            speedWarning = "速度过快（\(String(format: "%.1f", speedKmPerHour)) km/h），已暂停圈地"
-            isOverSpeed = true
-            TerritoryLogger.shared.log("超速 \(String(format: "%.1f", speedKmPerHour)) km/h，已停止追踪", type: .error)
-            stopPathTracking()
-            print("🚫 速度过快（\(String(format: "%.1f", speedKmPerHour)) km/h），已暂停圈地")
+        // ⭐ 多级速度检测逻辑
+        if speedKmPerHour > 100 {
+            // 🚨 超过 100 km/h：极端GPS漂移，必定是信号问题
+            handleGpsDrift(speedKmPerHour: speedKmPerHour, severity: "极端")
+            consecutiveGpsDriftCount += 1
+
+            // 如果连续多次漂移，给用户明确提示
+            if consecutiveGpsDriftCount >= maxConsecutiveDrifts {
+                speedWarning = "GPS信号持续不稳定，建议移动至空旷区域"
+                TerritoryLogger.shared.log("GPS信号持续不稳定（连续\(consecutiveGpsDriftCount)次漂移）", type: .error)
+            }
+
             return false
-        } else if speedKmPerHour > 15 {
-            // 超过 15 km/h，警告但继续
-            speedWarning = "速度较快（\(String(format: "%.1f", speedKmPerHour)) km/h），请减速"
+
+        } else if speedKmPerHour > 50 {
+            // ⚠️ 超过 50 km/h：明显的GPS漂移（可能是信号跳变）
+            handleGpsDrift(speedKmPerHour: speedKmPerHour, severity: "严重")
+            consecutiveGpsDriftCount += 1
+
+            if consecutiveGpsDriftCount >= 3 {
+                speedWarning = "GPS信号不稳定，建议稍后再试"
+                TerritoryLogger.shared.log("GPS连续漂移\(consecutiveGpsDriftCount)次", type: .warning)
+            }
+
+            return false
+
+        } else if speedKmPerHour > 20 {
+            // ⚠️ 超过 20 km/h：可能在骑车/跑步，或轻微GPS漂移
+            speedWarning = "速度较快（\(String(format: "%.1f", speedKmPerHour)) km/h），请减速至步行"
             isOverSpeed = true
             print("⚠️ 速度警告（\(String(format: "%.1f", speedKmPerHour)) km/h）")
             TerritoryLogger.shared.log("速度较快 \(String(format: "%.1f", speedKmPerHour)) km/h", type: .warning)
+
+            // 轻微超速不计入漂移次数
+            consecutiveGpsDriftCount = 0
             return true
+
         } else {
-            // 速度正常
+            // ✅ 速度正常（≤ 20 km/h）
             speedWarning = nil
             isOverSpeed = false
+            consecutiveGpsDriftCount = 0 // 重置漂移计数器
             return true
         }
+    }
+
+    /// 处理GPS漂移情况
+    /// - Parameters:
+    ///   - speedKmPerHour: 计算出的速度
+    ///   - severity: 严重程度描述
+    private func handleGpsDrift(speedKmPerHour: Double, severity: String) {
+        speedWarning = "GPS信号不稳定（\(severity)漂移 \(String(format: "%.0f", speedKmPerHour)) km/h）"
+        isOverSpeed = true
+
+        let logMessage = "GPS\(severity)漂移 \(String(format: "%.0f", speedKmPerHour)) km/h，已忽略异常点"
+        TerritoryLogger.shared.log(logMessage, type: .warning)
+        print("⚠️ \(logMessage)")
+
+        // 降低GPS信号质量评分
+        updateGPSQuality(max(0, gpsSignalQuality - 20))
     }
 
     // MARK: - 距离与面积计算

@@ -160,6 +160,11 @@ struct MapTabView: View {
             }
 
             Spacer()
+
+            // ⭐ GPS信号质量指示器（只在追踪时显示）
+            if locationManager.isTracking {
+                gpsQualityIndicator
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 60)
@@ -174,6 +179,63 @@ struct MapTabView: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    /// GPS信号质量指示器
+    private var gpsQualityIndicator: some View {
+        HStack(spacing: 6) {
+            // 信号图标（根据质量显示不同状态）
+            Image(systemName: gpsSignalIcon)
+                .font(.system(size: 16))
+                .foregroundColor(gpsSignalColor)
+
+            // 信号质量文字
+            Text(gpsSignalText)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(gpsSignalColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            gpsSignalColor.opacity(0.15)
+        )
+        .cornerRadius(12)
+    }
+
+    // GPS信号图标
+    private var gpsSignalIcon: String {
+        let quality = locationManager.gpsSignalQuality
+        if quality >= 70 {
+            return "antenna.radiowaves.left.and.right"
+        } else if quality >= 40 {
+            return "wifi.exclamationmark"
+        } else {
+            return "wifi.slash"
+        }
+    }
+
+    // GPS信号文字
+    private var gpsSignalText: String {
+        let quality = locationManager.gpsSignalQuality
+        if quality >= 70 {
+            return "信号良好"
+        } else if quality >= 40 {
+            return "信号一般"
+        } else {
+            return "信号较差"
+        }
+    }
+
+    // GPS信号颜色
+    private var gpsSignalColor: Color {
+        let quality = locationManager.gpsSignalQuality
+        if quality >= 70 {
+            return .green
+        } else if quality >= 40 {
+            return ApocalypseTheme.warning
+        } else {
+            return ApocalypseTheme.danger
+        }
     }
 
     /// 确认登记领地按钮

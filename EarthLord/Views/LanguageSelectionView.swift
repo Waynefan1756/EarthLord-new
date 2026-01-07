@@ -49,7 +49,7 @@ struct LanguageSelectionView: View {
                 Spacer()
             }
         }
-        .navigationTitle(NSLocalizedString("语言设置", comment: ""))
+        .navigationTitle("Language Settings")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

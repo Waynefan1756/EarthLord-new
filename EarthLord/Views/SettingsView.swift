@@ -41,7 +41,7 @@ struct SettingsView: View {
                                         icon: "envelope.fill",
                                         iconColor: .blue,
                                         title: "邮箱",
-                                        value: authManager.currentUserEmail ?? NSLocalizedString("未设置", comment: "")
+                                        value: authManager.currentUserEmail ?? "未设置".localized
                                     )
 
                                     Divider()
@@ -357,7 +357,7 @@ struct DeleteAccountConfirmView: View {
 
                     // 确认输入
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("请输入\"\(deleteKeyword)\"以确认")
+                        Text(String(format: NSLocalizedString("请输入\"%@\"以确认", comment: ""), deleteKeyword))
                             .font(.subheadline)
                             .foregroundColor(ApocalypseTheme.textSecondary)
 
