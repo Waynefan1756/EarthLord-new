@@ -42,6 +42,10 @@ struct MapTabView: View {
     @State private var collisionWarningLevel: WarningLevel = .safe
     @State private var trackingStartTime: Date?
 
+    // MARK: - 探索功能状态
+    @State private var isExploring: Bool = false
+    @State private var showExplorationResult: Bool = false
+
     /// 当前用户 ID
     private var currentUserId: String? {
         authManager.currentUser?.id.uuidString
@@ -96,26 +100,29 @@ struct MapTabView: View {
                 Spacer()
             }
 
-            // 右下角按钮组
+            // 底部按钮组
             VStack {
                 Spacer()
-                HStack {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        // ⭐ 确认登记按钮（只在验证通过时显示）
-                        if locationManager.territoryValidationPassed {
-                            confirmTerritoryButton
-                        }
 
-                        // 圈地按钮
-                        claimLandButton
-
-                        // 定位按钮
-                        locationButton
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 30)
+                // ⭐ 确认登记按钮（只在验证通过时显示，居中）
+                if locationManager.territoryValidationPassed {
+                    confirmTerritoryButton
+                        .padding(.bottom, 12)
                 }
+
+                // 三个按钮水平排列
+                HStack(spacing: 16) {
+                    // 左：圈地按钮
+                    claimLandButton
+
+                    // 中：定位按钮
+                    locationButton
+
+                    // 右：探索按钮
+                    exploreButton
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 30)
             }
 
             // 权限被拒绝时的提示卡片
@@ -135,6 +142,10 @@ struct MapTabView: View {
             Task {
                 await loadTerritories()
             }
+        }
+        // 探索结果弹窗
+        .sheet(isPresented: $showExplorationResult) {
+            ExplorationResultView(result: MockExplorationData.explorationResult)
         }
         // ⭐ 监听闭环状态，闭环后根据验证结果显示横幅
         .onReceive(locationManager.$isPathClosed) { isClosed in
@@ -320,7 +331,7 @@ struct MapTabView: View {
         }
     }
 
-    /// 右下角定位按钮
+    /// 定位按钮
     private var locationButton: some View {
         Button(action: {
             // 重新居中到用户位置
@@ -337,6 +348,49 @@ struct MapTabView: View {
                 .background(ApocalypseTheme.primary)
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+        }
+    }
+
+    /// 探索按钮
+    private var exploreButton: some View {
+        Button(action: {
+            performExploration()
+        }) {
+            HStack(spacing: 8) {
+                if isExploring {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "binoculars.fill")
+                        .font(.system(size: 16))
+                }
+
+                Text(isExploring ? "搜索中..." : "探索")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(isExploring ? ApocalypseTheme.textMuted : ApocalypseTheme.info)
+            .cornerRadius(25)
+            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+        }
+        .disabled(isExploring)
+    }
+
+    /// 执行探索操作
+    private func performExploration() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isExploring = true
+        }
+
+        // 1.5 秒后显示结果
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExploring = false
+            }
+            showExplorationResult = true
         }
     }
 
