@@ -18,6 +18,9 @@ struct MapTabView: View {
     /// 认证管理器（从 App 注入的全局实例）
     @EnvironmentObject var authManager: AuthManager
 
+    /// 探索管理器（从 App 注入的全局实例）
+    @EnvironmentObject var explorationManager: ExplorationManager
+
     /// 领地管理器
     private let territoryManager = TerritoryManager(supabase: supabase)
 
@@ -43,8 +46,8 @@ struct MapTabView: View {
     @State private var trackingStartTime: Date?
 
     // MARK: - 探索功能状态
-    @State private var isExploring: Bool = false
     @State private var showExplorationResult: Bool = false
+    @State private var currentExplorationResult: ExplorationResult?
 
     /// 当前用户 ID
     private var currentUserId: String? {
@@ -77,9 +80,14 @@ struct MapTabView: View {
             VStack {
                 headerView
 
-                // ⭐ 速度警告横幅
+                // ⭐ 速度警告横幅（圈地功能）
                 if locationManager.speedWarning != nil {
                     speedWarningBanner
+                }
+
+                // ⭐ 探索速度警告横幅
+                if explorationManager.isOverSpeed || explorationManager.explorationFailed {
+                    explorationSpeedWarningBanner
                 }
 
                 // ⭐ 验证结果横幅（闭环后显示）
@@ -145,7 +153,9 @@ struct MapTabView: View {
         }
         // 探索结果弹窗
         .sheet(isPresented: $showExplorationResult) {
-            ExplorationResultView(result: MockExplorationData.explorationResult)
+            if let result = currentExplorationResult {
+                ExplorationResultView(result: result)
+            }
         }
         // ⭐ 监听闭环状态，闭环后根据验证结果显示横幅
         .onReceive(locationManager.$isPathClosed) { isClosed in
@@ -354,43 +364,59 @@ struct MapTabView: View {
     /// 探索按钮
     private var exploreButton: some View {
         Button(action: {
-            performExploration()
+            Task {
+                await toggleExploration()
+            }
         }) {
             HStack(spacing: 8) {
-                if isExploring {
+                if explorationManager.isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
                 } else {
-                    Image(systemName: "binoculars.fill")
+                    Image(systemName: explorationManager.isExploring ? "stop.fill" : "binoculars.fill")
                         .font(.system(size: 16))
                 }
 
-                Text(isExploring ? "搜索中..." : "探索")
-                    .font(.system(size: 14, weight: .semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(explorationManager.isExploring ? "结束探索" : "探索")
+                        .font(.system(size: 14, weight: .semibold))
+
+                    // 探索中显示实时距离
+                    if explorationManager.isExploring {
+                        Text("\(explorationManager.formattedDistance) | \(explorationManager.currentRewardTier.displayName)")
+                            .font(.system(size: 11))
+                    }
+                }
             }
             .foregroundColor(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(isExploring ? ApocalypseTheme.textMuted : ApocalypseTheme.info)
+            .background(explorationManager.isExploring ? ApocalypseTheme.success : ApocalypseTheme.info)
             .cornerRadius(25)
             .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
         }
-        .disabled(isExploring)
+        .disabled(explorationManager.isLoading)
     }
 
-    /// 执行探索操作
-    private func performExploration() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            isExploring = true
-        }
-
-        // 1.5 秒后显示结果
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isExploring = false
+    /// 切换探索状态
+    private func toggleExploration() async {
+        if explorationManager.isExploring {
+            // 结束探索
+            do {
+                let result = try await explorationManager.endExploration()
+                currentExplorationResult = result
+                showExplorationResult = true
+            } catch {
+                print("结束探索失败: \(error)")
             }
-            showExplorationResult = true
+        } else {
+            // 开始探索
+            do {
+                try await explorationManager.startExploration()
+            } catch {
+                print("开始探索失败: \(error)")
+            }
         }
     }
 
@@ -470,7 +496,7 @@ struct MapTabView: View {
         .padding(.bottom, 100)
     }
 
-    /// 速度警告横幅
+    /// 速度警告横幅（圈地功能）
     private var speedWarningBanner: some View {
         HStack(spacing: 12) {
             // 警告图标
@@ -505,6 +531,62 @@ struct MapTabView: View {
                 }
             }
         }
+    }
+
+    /// 探索速度警告横幅
+    private var explorationSpeedWarningBanner: some View {
+        HStack(spacing: 12) {
+            // 图标
+            Image(systemName: explorationManager.explorationFailed ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.white)
+
+            VStack(alignment: .leading, spacing: 2) {
+                // 警告文字
+                if explorationManager.explorationFailed {
+                    Text(explorationManager.failureReason ?? "探索失败")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                } else if let warning = explorationManager.speedWarning {
+                    Text(warning)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                } else {
+                    Text("速度过快")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                }
+
+                // 当前速度
+                if explorationManager.isOverSpeed && !explorationManager.explorationFailed {
+                    Text(String(format: "当前: %.1f km/h | 限速: 30 km/h", explorationManager.currentSpeed))
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+
+            Spacer()
+
+            // 速度显示
+            if explorationManager.isOverSpeed && !explorationManager.explorationFailed {
+                Text(String(format: "%.0f", explorationManager.currentSpeed))
+                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            explorationManager.explorationFailed
+                ? ApocalypseTheme.danger   // 已失败：红色
+                : ApocalypseTheme.warning  // 警告中：黄色
+        )
+        .cornerRadius(12)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.isOverSpeed)
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.explorationFailed)
     }
 
     /// 验证结果横幅（根据验证结果显示成功或失败）

@@ -32,7 +32,6 @@ struct ExplorationResultView: View {
 
     /// 动画数值（从0跳动到目标值）
     @State private var animatedWalkingDistance: Double = 0
-    @State private var animatedExploredArea: Double = 0
     @State private var animatedDiscoveredPOIs: Int = 0
     @State private var animatedLootedPOIs: Int = 0
 
@@ -129,15 +128,8 @@ struct ExplorationResultView: View {
             animatedWalkingDistance = result.stats.walkingDistance
         }
 
-        // 探索面积动画（稍微延迟）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeOut(duration: 1.0)) {
-                animatedExploredArea = result.stats.exploredArea
-            }
-        }
-
         // POI 数量动画
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             animateIntValue(from: 0, to: result.stats.discoveredPOIs, duration: 0.8) { value in
                 animatedDiscoveredPOIs = value
             }
@@ -257,17 +249,6 @@ struct ExplorationResultView: View {
                 totalValue: result.stats.totalWalkingDistance,
                 rank: result.stats.walkingDistanceRank,
                 formatter: formatDistance
-            )
-
-            // 探索面积（使用动画数值）
-            animatedStatRow(
-                icon: "square.dashed",
-                iconColor: ApocalypseTheme.info,
-                title: "探索面积",
-                currentValue: animatedExploredArea,
-                totalValue: result.stats.totalExploredArea,
-                rank: result.stats.exploredAreaRank,
-                formatter: formatArea
             )
 
             // 探索时长
@@ -430,7 +411,7 @@ struct ExplorationResultView: View {
             // 物品列表（带动画）
             VStack(spacing: 10) {
                 ForEach(result.lootItems) { loot in
-                    if let definition = MockExplorationData.getItemDefinition(for: loot.itemId) {
+                    if let definition = ItemDefinitions.get(loot.itemId) {
                         animatedRewardItemRow(loot: loot, definition: definition)
                     }
                 }
@@ -563,15 +544,6 @@ struct ExplorationResultView: View {
             return String(format: "%.2f km", meters / 1000)
         } else {
             return String(format: "%.0f m", meters)
-        }
-    }
-
-    /// 格式化面积
-    private func formatArea(_ sqMeters: Double) -> String {
-        if sqMeters >= 10000 {
-            return String(format: "%.1f 万m²", sqMeters / 10000)
-        } else {
-            return String(format: "%.0f m²", sqMeters)
         }
     }
 }

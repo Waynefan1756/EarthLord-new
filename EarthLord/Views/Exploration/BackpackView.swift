@@ -49,6 +49,11 @@ enum BackpackFilterType: String, CaseIterable {
 // MARK: - 背包视图
 
 struct BackpackView: View {
+    // MARK: 依赖
+
+    /// 背包管理器（从 App 注入的全局实例）
+    @EnvironmentObject var inventoryManager: InventoryManager
+
     // MARK: 状态
 
     /// 搜索文字
@@ -68,7 +73,7 @@ struct BackpackView: View {
 
     /// 当前使用的容量
     private var usedCapacity: Double {
-        MockExplorationData.calculateTotalWeight()
+        inventoryManager.totalWeight
     }
 
     /// 容量使用百分比
@@ -80,8 +85,8 @@ struct BackpackView: View {
     private var filteredItems: [(item: InventoryItem, definition: ItemDefinition)] {
         var result: [(InventoryItem, ItemDefinition)] = []
 
-        for item in MockExplorationData.inventoryItems {
-            guard let definition = MockExplorationData.getItemDefinition(for: item.itemId) else {
+        for item in inventoryManager.items {
+            guard let definition = ItemDefinitions.get(item.itemId) else {
                 continue
             }
 
@@ -133,6 +138,16 @@ struct BackpackView: View {
         }
         // 注意：BackpackView 嵌套在 ResourcesTabView 的 NavigationStack 中
         // 不需要单独设置 navigationTitle，由父视图统一管理
+        .onAppear {
+            // 加载背包数据
+            Task {
+                try? await inventoryManager.loadInventory()
+            }
+        }
+        .refreshable {
+            // 下拉刷新
+            try? await inventoryManager.loadInventory()
+        }
     }
 
     // MARK: - 容量状态卡

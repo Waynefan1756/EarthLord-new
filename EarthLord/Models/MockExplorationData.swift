@@ -282,10 +282,6 @@ struct ExplorationStats: Codable {
     let totalWalkingDistance: Double    // 累计行走距离（米）
     let walkingDistanceRank: Int        // 行走距离排名
 
-    let exploredArea: Double            // 本次探索面积（平方米）
-    let totalExploredArea: Double       // 累计探索面积（平方米）
-    let exploredAreaRank: Int           // 探索面积排名
-
     let duration: TimeInterval          // 探索时长（秒）
     let discoveredPOIs: Int             // 发现的POI数量
     let lootedPOIs: Int                 // 搜刮的POI数量
@@ -296,15 +292,6 @@ struct ExplorationStats: Codable {
             return String(format: "%.2f 公里", walkingDistance / 1000)
         } else {
             return String(format: "%.0f 米", walkingDistance)
-        }
-    }
-
-    /// 格式化探索面积
-    var formattedExploredArea: String {
-        if exploredArea >= 10000 {
-            return String(format: "%.2f 万平方米", exploredArea / 10000)
-        } else {
-            return String(format: "%.0f 平方米", exploredArea)
         }
     }
 
@@ -626,9 +613,6 @@ struct MockExplorationData {
             walkingDistance: 2500,              // 本次行走 2500 米
             totalWalkingDistance: 15000,        // 累计行走 15000 米
             walkingDistanceRank: 42,            // 排名第 42
-            exploredArea: 50000,                // 本次探索 5 万平方米
-            totalExploredArea: 250000,          // 累计探索 25 万平方米
-            exploredAreaRank: 38,               // 排名第 38
             duration: 1800,                     // 30 分钟
             discoveredPOIs: 2,                  // 发现 2 个 POI
             lootedPOIs: 1                       // 搜刮 1 个 POI
@@ -650,9 +634,6 @@ struct MockExplorationData {
         walkingDistance: 2500,
         totalWalkingDistance: 15000,
         walkingDistanceRank: 42,
-        exploredArea: 50000,
-        totalExploredArea: 250000,
-        exploredAreaRank: 38,
         duration: 1800,
         discoveredPOIs: 2,
         lootedPOIs: 1
