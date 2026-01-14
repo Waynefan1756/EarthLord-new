@@ -171,11 +171,34 @@ class ExplorationManager: ObservableObject {
     /// 失败原因
     @Published var failureReason: String?
 
+    // MARK: - POI 搜刮相关
+
+    /// 附近POI列表
+    @Published var nearbyPOIs: [ExplorablePOI] = []
+
+    /// 是否显示POI搜刮弹窗
+    @Published var showPOIPopup: Bool = false
+
+    /// 当前可搜刮的POI
+    @Published var currentScavengePOI: ExplorablePOI?
+
+    /// 是否显示搜刮结果
+    @Published var showScavengeResult: Bool = false
+
+    /// 搜刮获得的物品
+    @Published var scavengeLootItems: [LootItem] = []
+
+    /// 本次探索搜刮的POI数量
+    @Published var scavengedPOICount: Int = 0
+
     // MARK: - Dependencies
 
     private let supabaseClient: SupabaseClient
     private weak var locationManager: LocationManager?
     private weak var inventoryManager: InventoryManager?
+
+    /// POI搜索管理器
+    private let poiSearchManager = POISearchManager()
 
     // MARK: - Private Properties
 
@@ -185,8 +208,11 @@ class ExplorationManager: ObservableObject {
     /// 上一次位置更新时间
     private var lastLocationTime: Date?
 
-    /// 探索轨迹
-    private var explorationPath: [CLLocationCoordinate2D] = []
+    /// 探索轨迹（公开供地图显示）
+    @Published var explorationPath: [CLLocationCoordinate2D] = []
+
+    /// 探索路径更新版本号（用于触发地图更新）
+    @Published var explorationPathVersion: Int = 0
 
     /// 位置更新订阅
     private var locationCancellable: AnyCancellable?
@@ -293,6 +319,9 @@ class ExplorationManager: ObservableObject {
 
             // 5. 开始速度检测定时器
             startSpeedCheckTimer()
+
+            // 6. 搜索附近POI并设置围栏
+            await searchAndSetupPOIs()
 
             isLoading = false
 
@@ -545,6 +574,7 @@ class ExplorationManager: ObservableObject {
         lastLocation = newLocation
         lastLocationTime = now
         explorationPath.append(coordinate)
+        explorationPathVersion += 1
 
         // 更新奖励等级
         let newTier = RewardTier.fromDistance(currentDistance)
@@ -655,6 +685,10 @@ class ExplorationManager: ObservableObject {
         explorationPath.removeAll()
         lastLocation = nil
         lastLocationTime = nil
+
+        // 清理POI相关状态
+        cleanupPOIs()
+
         logger.log("探索状态已重置", type: .info)
     }
 
@@ -699,6 +733,122 @@ class ExplorationManager: ObservableObject {
                 .execute()
             logger.log("创建新的累计统计记录", type: .success)
         }
+    }
+
+    // MARK: - POI 搜刮方法
+
+    /// 搜索附近POI并设置围栏
+    private func searchAndSetupPOIs() async {
+        guard let location = locationManager?.userLocation else {
+            logger.log("无法获取用户位置，跳过POI搜索", type: .warning)
+            return
+        }
+
+        do {
+            // 搜索附近POI
+            let pois = try await poiSearchManager.searchNearbyPOIs(center: location)
+            nearbyPOIs = pois
+
+            logger.log("找到 \(pois.count) 个附近POI", type: .success)
+
+            // 设置围栏监控
+            for poi in pois {
+                locationManager?.startMonitoringPOI(poi)
+            }
+
+            // 设置围栏进入回调
+            locationManager?.onRegionEntered = { [weak self] regionId in
+                Task { @MainActor in
+                    self?.handleRegionEntered(regionId: regionId)
+                }
+            }
+
+        } catch {
+            logger.log("搜索POI失败: \(error.localizedDescription)", type: .error)
+        }
+    }
+
+    /// 处理进入围栏事件
+    private func handleRegionEntered(regionId: String) {
+        // 查找对应的POI
+        guard let poi = nearbyPOIs.first(where: { $0.regionIdentifier == regionId }),
+              !poi.isScavenged else {
+            return
+        }
+
+        logger.log("进入POI范围: \(poi.name)", type: .success)
+
+        // 设置当前POI并显示弹窗
+        currentScavengePOI = poi
+        showPOIPopup = true
+    }
+
+    /// 执行搜刮
+    func performScavenge() {
+        guard let poi = currentScavengePOI else { return }
+
+        logger.log("开始搜刮: \(poi.name)", type: .info)
+
+        // 生成奖励（使用银级奖励作为POI搜刮的默认等级）
+        let tier = RewardTier.silver
+        let lootItems = RewardGenerator.generateRewards(tier: tier, source: poi.name)
+
+        // 保存搜刮结果
+        scavengeLootItems = lootItems
+
+        // 标记POI已搜刮
+        if let index = nearbyPOIs.firstIndex(where: { $0.id == poi.id }) {
+            nearbyPOIs[index].isScavenged = true
+        }
+
+        // 更新搜刮计数
+        scavengedPOICount += 1
+
+        // 停止监控该围栏
+        locationManager?.stopMonitoringPOI(identifier: poi.regionIdentifier)
+
+        // 添加物品到背包
+        Task {
+            do {
+                try await inventoryManager?.addItems(lootItems, explorationSessionId: currentSessionId)
+                logger.log("物品已添加到背包: \(lootItems.count)件", type: .success)
+            } catch {
+                logger.log("添加物品失败: \(error)", type: .error)
+            }
+        }
+
+        // 关闭接近弹窗，显示结果弹窗
+        showPOIPopup = false
+        showScavengeResult = true
+
+        logger.log("搜刮完成，获得 \(lootItems.count) 件物品", type: .success)
+    }
+
+    /// 跳过搜刮
+    func skipScavenge() {
+        logger.log("跳过搜刮: \(currentScavengePOI?.name ?? "")", type: .info)
+        showPOIPopup = false
+        currentScavengePOI = nil
+    }
+
+    /// 关闭搜刮结果
+    func closeScavengeResult() {
+        showScavengeResult = false
+        scavengeLootItems = []
+        currentScavengePOI = nil
+    }
+
+    /// 清理POI和围栏
+    private func cleanupPOIs() {
+        locationManager?.stopMonitoringAllPOIs()
+        locationManager?.onRegionEntered = nil
+        nearbyPOIs.removeAll()
+        currentScavengePOI = nil
+        showPOIPopup = false
+        showScavengeResult = false
+        scavengeLootItems = []
+        scavengedPOICount = 0
+        logger.log("已清理所有POI和围栏", type: .info)
     }
 
     // MARK: - 格式化辅助方法

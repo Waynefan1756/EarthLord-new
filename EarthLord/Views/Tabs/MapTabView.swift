@@ -68,7 +68,11 @@ struct MapTabView: View {
                     isTracking: locationManager.isTracking,
                     isPathClosed: locationManager.isPathClosed,
                     territories: territories,
-                    currentUserId: authManager.currentUser?.id.uuidString
+                    currentUserId: authManager.currentUser?.id.uuidString,
+                    explorationPath: explorationManager.explorationPath,
+                    explorationPathVersion: explorationManager.explorationPathVersion,
+                    isExploring: explorationManager.isExploring,
+                    nearbyPOIs: explorationManager.nearbyPOIs
                 )
                 .edgesIgnoringSafeArea(.all)
             } else {
@@ -79,6 +83,11 @@ struct MapTabView: View {
             // 顶部标题栏
             VStack {
                 headerView
+
+                // ⭐ 探索状态栏（探索中时显示）
+                if explorationManager.isExploring {
+                    explorationStatusBar
+                }
 
                 // ⭐ 速度警告横幅（圈地功能）
                 if locationManager.speedWarning != nil {
@@ -157,6 +166,37 @@ struct MapTabView: View {
                 ExplorationResultView(result: result)
             }
         }
+        // POI接近弹窗
+        .sheet(isPresented: $explorationManager.showPOIPopup) {
+            if let poi = explorationManager.currentScavengePOI {
+                POIProximityPopup(
+                    poi: poi,
+                    onScavenge: {
+                        explorationManager.performScavenge()
+                    },
+                    onSkip: {
+                        explorationManager.skipScavenge()
+                    }
+                )
+                .presentationDetents([.height(380)])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        // 搜刮结果弹窗
+        .sheet(isPresented: $explorationManager.showScavengeResult) {
+            if let poi = explorationManager.currentScavengePOI {
+                ScavengeResultView(
+                    poiName: poi.name,
+                    poiType: poi.type,
+                    lootItems: explorationManager.scavengeLootItems,
+                    onClose: {
+                        explorationManager.closeScavengeResult()
+                    }
+                )
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
+        }
         // ⭐ 监听闭环状态，闭环后根据验证结果显示横幅
         .onReceive(locationManager.$isPathClosed) { isClosed in
             if isClosed {
@@ -217,6 +257,103 @@ struct MapTabView: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    /// 探索状态栏
+    private var explorationStatusBar: some View {
+        VStack(spacing: 6) {
+            // 第一行：探索中 + 距离 + 时长
+            HStack(spacing: 16) {
+                // 探索中状态
+                HStack(spacing: 6) {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 14))
+                    Text("探索中")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+
+                // 距离
+                HStack(spacing: 4) {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 12))
+                    Text(explorationManager.formattedDistance)
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                }
+
+                // 时长
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 12))
+                    Text(explorationManager.formattedDuration)
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                }
+
+                Spacer()
+
+                // 结束探索按钮
+                Button(action: {
+                    Task {
+                        await toggleExploration()
+                    }
+                }) {
+                    Text("结束探索")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.3))
+                        .cornerRadius(12)
+                }
+            }
+
+            // 第二行：距离下一等级的提示
+            HStack {
+                Image(systemName: "target")
+                    .font(.system(size: 12))
+                Text(distanceToNextTierText)
+                    .font(.system(size: 12))
+                Spacer()
+            }
+            .opacity(0.9)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            LinearGradient(
+                colors: [ApocalypseTheme.primary, ApocalypseTheme.primary.opacity(0.8)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.isExploring)
+    }
+
+    /// 距离下一等级的提示文本
+    private var distanceToNextTierText: String {
+        let currentDistance = explorationManager.currentDistance
+        let currentTier = explorationManager.currentRewardTier
+
+        switch currentTier {
+        case .none:
+            let remaining = 200 - currentDistance
+            return "距铜级还差 \(Int(max(0, remaining)))m"
+        case .bronze:
+            let remaining = 500 - currentDistance
+            return "距银级还差 \(Int(max(0, remaining)))m"
+        case .silver:
+            let remaining = 1000 - currentDistance
+            return "距金级还差 \(Int(max(0, remaining)))m"
+        case .gold:
+            let remaining = 2000 - currentDistance
+            return "距钻石级还差 \(Int(max(0, remaining)))m"
+        case .diamond:
+            return "已达最高等级 🎉"
+        }
     }
 
     /// GPS信号质量指示器

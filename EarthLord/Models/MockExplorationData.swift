@@ -124,6 +124,75 @@ struct POI: Identifiable, Codable {
     }
 }
 
+// MARK: - 可探索POI（用于地理围栏搜刮）
+
+import MapKit
+
+/// 可探索的POI（从MKMapItem转换，用于地理围栏搜刮）
+struct ExplorablePOI: Identifiable, Equatable {
+    let id: String                          // UUID
+    let name: String                        // POI名称
+    let type: POIType                       // POI类型
+    let coordinate: CLLocationCoordinate2D  // 坐标位置（WGS-84）
+    var isScavenged: Bool                   // 是否已搜刮
+
+    /// 围栏标识符（用于CLCircularRegion）
+    var regionIdentifier: String {
+        "poi_region_\(id)"
+    }
+
+    /// 从 MKMapItem 创建 ExplorablePOI
+    /// - Parameter mapItem: MapKit搜索结果
+    /// - Returns: 转换后的ExplorablePOI，如果信息不完整则返回nil
+    static func from(mapItem: MKMapItem) -> ExplorablePOI? {
+        guard let name = mapItem.name,
+              let location = mapItem.placemark.location else {
+            return nil
+        }
+
+        // 映射POI类型
+        let poiType = mapPOIType(from: mapItem.pointOfInterestCategory)
+
+        return ExplorablePOI(
+            id: UUID().uuidString,
+            name: name,
+            type: poiType,
+            coordinate: location.coordinate,
+            isScavenged: false
+        )
+    }
+
+    /// MKPointOfInterestCategory → POIType 映射
+    /// - Parameter category: Apple的POI分类
+    /// - Returns: 游戏中的POI类型
+    private static func mapPOIType(from category: MKPointOfInterestCategory?) -> POIType {
+        guard let category = category else { return .residential }
+
+        switch category {
+        case .store, .foodMarket:
+            return .supermarket
+        case .hospital:
+            return .hospital
+        case .pharmacy:
+            return .pharmacy
+        case .gasStation, .evCharger:
+            return .gasStation
+        case .restaurant, .cafe, .bakery:
+            return .supermarket  // 餐饮类归为超市（有食物）
+        case .bank, .atm:
+            return .warehouse    // 银行类归为仓库
+        default:
+            return .residential
+        }
+    }
+
+    // MARK: - Equatable
+
+    static func == (lhs: ExplorablePOI, rhs: ExplorablePOI) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 // MARK: - 背包物品相关
 
 /// 物品分类

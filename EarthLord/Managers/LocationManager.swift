@@ -8,6 +8,7 @@
 import Foundation
 import CoreLocation
 import Combine
+import UIKit
 
 // MARK: - LocationManager
 /// GPS 定位管理器
@@ -96,6 +97,14 @@ class LocationManager: NSObject, ObservableObject {
 
     /// 最大允许连续漂移次数
     private let maxConsecutiveDrifts: Int = 5
+
+    // MARK: - POI 地理围栏监控
+
+    /// 围栏进入回调（参数为围栏标识符）
+    var onRegionEntered: ((String) -> Void)?
+
+    /// 当前监控的围栏列表
+    private var monitoredRegions: [String: CLCircularRegion] = [:]
 
     // MARK: - Computed Properties
 
@@ -631,6 +640,56 @@ class LocationManager: NSObject, ObservableObject {
         TerritoryLogger.shared.log("领地验证通过！面积: \(String(format: "%.0f", area))m²", type: .success)
         return (true, nil)
     }
+
+    // MARK: - POI 地理围栏管理
+
+    /// 开始监控POI围栏（50米半径）
+    /// - Parameter poi: 要监控的POI
+    func startMonitoringPOI(_ poi: ExplorablePOI) {
+        // 检查围栏数量限制（iOS限制20个）
+        guard monitoredRegions.count < 20 else {
+            print("⚠️ 围栏数量已达上限(20)，无法添加更多")
+            return
+        }
+
+        // 转换坐标（中国地区需要GCJ-02）
+        let gcj02Coordinate = CoordinateConverter.wgs84ToGcj02(poi.coordinate)
+
+        // 创建50米围栏
+        let region = CLCircularRegion(
+            center: gcj02Coordinate,
+            radius: 50,
+            identifier: poi.regionIdentifier
+        )
+        region.notifyOnEntry = true
+        region.notifyOnExit = false  // 只关注进入
+
+        // 开始监控
+        locationManager.startMonitoring(for: region)
+        monitoredRegions[poi.regionIdentifier] = region
+
+        print("📍 开始监控POI围栏: \(poi.name) (ID: \(poi.regionIdentifier))")
+    }
+
+    /// 停止监控所有POI围栏
+    func stopMonitoringAllPOIs() {
+        for (identifier, region) in monitoredRegions {
+            locationManager.stopMonitoring(for: region)
+            print("🛑 停止监控围栏: \(identifier)")
+        }
+        monitoredRegions.removeAll()
+        print("🛑 已清除所有POI围栏监控")
+    }
+
+    /// 停止监控单个POI围栏
+    /// - Parameter identifier: 围栏标识符
+    func stopMonitoringPOI(identifier: String) {
+        if let region = monitoredRegions[identifier] {
+            locationManager.stopMonitoring(for: region)
+            monitoredRegions.removeValue(forKey: identifier)
+            print("🛑 停止监控单个围栏: \(identifier)")
+        }
+    }
 }
 
 // MARK: - CLLocationManagerDelegate
@@ -666,5 +725,31 @@ extension LocationManager: CLLocationManagerDelegate {
         DispatchQueue.main.async {
             self.locationError = "定位失败：\(error.localizedDescription)"
         }
+    }
+
+    // MARK: - 地理围栏代理方法
+
+    /// 进入围栏区域回调
+    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        guard let circularRegion = region as? CLCircularRegion else { return }
+
+        print("🎯 进入围栏区域: \(circularRegion.identifier)")
+
+        // 触发震动反馈
+        #if os(iOS)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+        #endif
+
+        // 调用回调（切换到主线程）
+        DispatchQueue.main.async { [weak self] in
+            self?.onRegionEntered?(circularRegion.identifier)
+        }
+    }
+
+    /// 围栏监控失败
+    func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
+        print("❌ 围栏监控失败: \(region?.identifier ?? "unknown") - \(error.localizedDescription)")
     }
 }

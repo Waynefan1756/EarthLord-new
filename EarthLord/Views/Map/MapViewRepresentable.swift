@@ -8,6 +8,23 @@
 import SwiftUI
 import MapKit
 
+// MARK: - POIAnnotation
+
+/// POI 地图标注
+class POIAnnotation: NSObject, MKAnnotation {
+    let poi: ExplorablePOI
+    let coordinate: CLLocationCoordinate2D
+
+    var title: String? { poi.name }
+    var subtitle: String? { poi.type.displayName }
+
+    init(poi: ExplorablePOI, coordinate: CLLocationCoordinate2D) {
+        self.poi = poi
+        self.coordinate = coordinate
+        super.init()
+    }
+}
+
 // MARK: - MapViewRepresentable
 
 struct MapViewRepresentable: UIViewRepresentable {
@@ -37,6 +54,22 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     /// 当前用户 ID
     let currentUserId: String?
+
+    // MARK: - 探索路径相关
+
+    /// 探索路径坐标数组
+    let explorationPath: [CLLocationCoordinate2D]
+
+    /// 探索路径更新版本号
+    let explorationPathVersion: Int
+
+    /// 是否正在探索
+    let isExploring: Bool
+
+    // MARK: - POI 标注相关
+
+    /// 附近POI列表
+    let nearbyPOIs: [ExplorablePOI]
 
     // MARK: - UIViewRepresentable
 
@@ -70,6 +103,12 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         // 绘制领地
         drawTerritories(on: uiView)
+
+        // 绘制探索路径
+        updateExplorationPath(on: uiView)
+
+        // 更新POI标注
+        updatePOIAnnotations(on: uiView)
     }
 
     /// 创建协调器
@@ -163,6 +202,54 @@ struct MapViewRepresentable: UIViewRepresentable {
         }
     }
 
+    /// 更新探索路径
+    private func updateExplorationPath(on mapView: MKMapView) {
+        // 移除旧的探索轨迹线（通过 title 识别）
+        let explorationOverlays = mapView.overlays.filter { overlay in
+            if let polyline = overlay as? MKPolyline {
+                return polyline.title == "exploration"
+            }
+            return false
+        }
+        mapView.removeOverlays(explorationOverlays)
+
+        // 如果没有探索路径点或不在探索中，直接返回
+        guard !explorationPath.isEmpty && isExploring else { return }
+
+        // 将 WGS-84 坐标转换为 GCJ-02 坐标（解决中国地区偏移问题）
+        let gcj02Coordinates = CoordinateConverter.wgs84ToGcj02(explorationPath)
+
+        // 创建探索轨迹线
+        let polyline = MKPolyline(coordinates: gcj02Coordinates, count: gcj02Coordinates.count)
+        polyline.title = "exploration"  // 标记为探索路径
+        mapView.addOverlay(polyline, level: .aboveRoads)
+
+        print("🚶 探索轨迹已更新，共 \(explorationPath.count) 个点")
+    }
+
+    /// 更新POI标注
+    private func updatePOIAnnotations(on mapView: MKMapView) {
+        // 移除旧的POI标记
+        let existingAnnotations = mapView.annotations.filter { $0 is POIAnnotation }
+        mapView.removeAnnotations(existingAnnotations)
+
+        // 如果不在探索中，不显示POI
+        guard isExploring else { return }
+
+        // 添加新的POI标记
+        for poi in nearbyPOIs {
+            // 坐标转换（中国地区需要GCJ-02）
+            let gcj02Coordinate = CoordinateConverter.wgs84ToGcj02(poi.coordinate)
+
+            let annotation = POIAnnotation(poi: poi, coordinate: gcj02Coordinate)
+            mapView.addAnnotation(annotation)
+        }
+
+        if !nearbyPOIs.isEmpty {
+            print("🗺️ 已添加 \(nearbyPOIs.count) 个POI标记")
+        }
+    }
+
     // MARK: - Coordinator
 
     /// 协调器：处理 MKMapView 的代理回调
@@ -228,6 +315,41 @@ struct MapViewRepresentable: UIViewRepresentable {
             print("❌ 地图加载失败：\(error.localizedDescription)")
         }
 
+        /// ⭐ 自定义标注视图（POI标记）
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            // 用户位置使用默认蓝点
+            if annotation is MKUserLocation {
+                return nil
+            }
+
+            // POI标记
+            if let poiAnnotation = annotation as? POIAnnotation {
+                let identifier = "POIAnnotation"
+                var view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+
+                if view == nil {
+                    view = MKMarkerAnnotationView(annotation: poiAnnotation, reuseIdentifier: identifier)
+                    view?.canShowCallout = true
+                } else {
+                    view?.annotation = poiAnnotation
+                }
+
+                // 设置图标和颜色
+                view?.glyphImage = UIImage(systemName: poiAnnotation.poi.type.iconName)
+                view?.markerTintColor = UIColor(poiAnnotation.poi.type.themeColor)
+
+                // 已搜刮的POI显示灰色
+                if poiAnnotation.poi.isScavenged {
+                    view?.markerTintColor = .gray
+                    view?.alpha = 0.5
+                }
+
+                return view
+            }
+
+            return nil
+        }
+
         /// ⭐ 渲染覆盖物（轨迹线和多边形）- 关键方法！
         /// 如果不实现这个方法，轨迹添加了也看不见！
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -235,14 +357,21 @@ struct MapViewRepresentable: UIViewRepresentable {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
 
-                // ⭐ 根据路径是否闭合改变颜色
-                if parent.isPathClosed {
-                    renderer.strokeColor = UIColor.systemGreen  // 闭环后：绿色
+                // ⭐ 根据轨迹类型设置颜色
+                if polyline.title == "exploration" {
+                    // 探索路径：橙色
+                    renderer.strokeColor = UIColor.systemOrange
+                    renderer.lineWidth = 4
+                } else if parent.isPathClosed {
+                    // 圈地已闭环：绿色
+                    renderer.strokeColor = UIColor.systemGreen
+                    renderer.lineWidth = 5
                 } else {
-                    renderer.strokeColor = UIColor.systemCyan   // 追踪中：青色
+                    // 圈地追踪中：青色
+                    renderer.strokeColor = UIColor.systemCyan
+                    renderer.lineWidth = 5
                 }
 
-                renderer.lineWidth = 5                          // 线宽 5pt
                 renderer.lineCap = .round                       // 圆头
                 renderer.lineJoin = .round                      // 圆角连接
                 return renderer
