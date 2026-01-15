@@ -196,9 +196,13 @@ class ExplorationManager: ObservableObject {
     private let supabaseClient: SupabaseClient
     private weak var locationManager: LocationManager?
     private weak var inventoryManager: InventoryManager?
+    private weak var playerLocationService: PlayerLocationService?
 
     /// POI搜索管理器
     private let poiSearchManager = POISearchManager()
+
+    /// 探索期间位置上报定时器
+    private var explorationReportTimer: Timer?
 
     // MARK: - Private Properties
 
@@ -248,10 +252,11 @@ class ExplorationManager: ObservableObject {
 
     // MARK: - Initialization
 
-    init(supabase: SupabaseClient, locationManager: LocationManager, inventoryManager: InventoryManager) {
+    init(supabase: SupabaseClient, locationManager: LocationManager, inventoryManager: InventoryManager, playerLocationService: PlayerLocationService) {
         self.supabaseClient = supabase
         self.locationManager = locationManager
         self.inventoryManager = inventoryManager
+        self.playerLocationService = playerLocationService
         logger.log("ExplorationManager 初始化完成", type: .info)
     }
 
@@ -320,8 +325,11 @@ class ExplorationManager: ObservableObject {
             // 5. 开始速度检测定时器
             startSpeedCheckTimer()
 
-            // 6. 搜索附近POI并设置围栏
+            // 6. 搜索附近POI并设置围栏（包含密度查询）
             await searchAndSetupPOIs()
+
+            // 7. 开始探索期间的位置上报（每30秒）
+            startExplorationReporting()
 
             isLoading = false
 
@@ -353,19 +361,25 @@ class ExplorationManager: ObservableObject {
             stopLocationTracking()
             stopDurationTimer()
             stopSpeedCheckTimer()
+            stopExplorationReporting()
 
-            // 2. 计算最终数据
+            // 2. 上报最终位置
+            if let location = locationManager?.userLocation {
+                await playerLocationService?.reportLocation(location)
+            }
+
+            // 3. 计算最终数据
             let endTime = Date()
             let duration = endTime.timeIntervalSince(startTime)
             let tier = RewardTier.fromDistance(currentDistance)
 
             logger.log("探索时长: \(Int(duration))秒, 奖励等级: \(tier.displayName)", type: .info)
 
-            // 3. 生成奖励
+            // 4. 生成奖励
             let lootItems = RewardGenerator.generateRewards(tier: tier, source: "探索奖励")
             logger.log("生成奖励物品: \(lootItems.count)件", type: .info)
 
-            // 4. 更新数据库会话记录
+            // 5. 更新数据库会话记录
             let updateSession = UpdateExplorationSession(
                 endedAt: endTime,
                 durationSeconds: Int(duration),
@@ -382,16 +396,16 @@ class ExplorationManager: ObservableObject {
 
             logger.log("数据库会话记录已更新", type: .success)
 
-            // 5. 将物品添加到背包
+            // 6. 将物品添加到背包
             if !lootItems.isEmpty {
                 try await inventoryManager?.addItems(lootItems, explorationSessionId: sessionId)
                 logger.log("物品已添加到背包", type: .success)
             }
 
-            // 6. 更新用户累计统计
+            // 7. 更新用户累计统计
             try await updateUserStats(distance: currentDistance, itemCount: lootItems.count)
 
-            // 7. 创建探索结果（简化版，移除面积相关字段）
+            // 8. 创建探索结果（简化版，移除面积相关字段）
             let stats = ExplorationStats(
                 walkingDistance: currentDistance,
                 totalWalkingDistance: 0,
@@ -628,6 +642,27 @@ class ExplorationManager: ObservableObject {
         logger.log("速度检测定时器已停止", type: .info)
     }
 
+    // MARK: - 探索期间位置上报
+
+    /// 开始探索期间的位置上报（每30秒）
+    private func startExplorationReporting() {
+        explorationReportTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self,
+                      let location = self.locationManager?.userLocation else { return }
+                await self.playerLocationService?.reportLocation(location)
+            }
+        }
+        logger.log("探索位置上报已启动（间隔30秒）", type: .info)
+    }
+
+    /// 停止探索期间的位置上报
+    private func stopExplorationReporting() {
+        explorationReportTimer?.invalidate()
+        explorationReportTimer = nil
+        logger.log("探索位置上报已停止", type: .info)
+    }
+
     /// 检查超速是否超时
     private func checkOverSpeedTimeout() {
         guard isOverSpeed, let overSpeedStart = overSpeedStartTime else {
@@ -686,6 +721,9 @@ class ExplorationManager: ObservableObject {
         lastLocation = nil
         lastLocationTime = nil
 
+        // 停止探索位置上报
+        stopExplorationReporting()
+
         // 清理POI相关状态
         cleanupPOIs()
 
@@ -739,24 +777,64 @@ class ExplorationManager: ObservableObject {
 
     /// 搜索附近POI并设置围栏
     private func searchAndSetupPOIs() async {
-        guard let location = locationManager?.userLocation else {
-            logger.log("无法获取用户位置，跳过POI搜索", type: .warning)
+        logger.log("开始搜索附近POI...", type: .info)
+
+        // 等待位置可用（最多等待5秒）
+        var location = locationManager?.userLocation
+        var waitCount = 0
+        while location == nil && waitCount < 10 {
+            logger.log("等待位置获取... (\(waitCount + 1)/10)", type: .info)
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+            location = locationManager?.userLocation
+            waitCount += 1
+        }
+
+        guard let location = location else {
+            logger.log("❌ 等待5秒后仍无法获取用户位置，跳过POI搜索", type: .error)
             return
         }
 
+        logger.log("当前位置: (\(String(format: "%.6f", location.latitude)), \(String(format: "%.6f", location.longitude)))", type: .gps)
+
         do {
-            // 搜索附近POI
-            let pois = try await poiSearchManager.searchNearbyPOIs(center: location)
+            // 1. 上报当前位置
+            logger.log("正在上报位置...", type: .info)
+            await playerLocationService?.reportLocation(location)
+            logger.log("位置上报完成", type: .success)
+
+            // 2. 查询附近玩家数量，获取密度等级
+            logger.log("正在查询附近玩家数量...", type: .info)
+            var nearbyCount = 0
+            do {
+                nearbyCount = await playerLocationService?.queryNearbyPlayerCount(at: location) ?? 0
+                logger.log("附近玩家查询成功: \(nearbyCount) 人", type: .success)
+            } catch {
+                logger.log("附近玩家查询失败（使用默认值0）: \(error.localizedDescription)", type: .warning)
+            }
+
+            let density = PlayerDensityLevel.from(playerCount: nearbyCount)
+            let poiCount = density.recommendedPOICount
+
+            logger.log("密度等级: \(density.displayName)，推荐POI数量: \(poiCount)", type: .info)
+
+            // 3. 根据密度搜索指定数量的POI
+            logger.log("正在搜索POI（数量: \(poiCount)）...", type: .info)
+            let pois = try await poiSearchManager.searchNearbyPOIs(center: location, maxCount: poiCount)
             nearbyPOIs = pois
 
-            logger.log("找到 \(pois.count) 个附近POI", type: .success)
+            logger.log("✅ 找到 \(pois.count) 个附近POI", type: .success)
+            for poi in pois {
+                logger.log("  - \(poi.name) (\(poi.type.displayName))", type: .info)
+            }
 
-            // 设置围栏监控
+            // 4. 设置围栏监控
+            logger.log("正在设置围栏监控...", type: .info)
             for poi in pois {
                 locationManager?.startMonitoringPOI(poi)
             }
+            logger.log("围栏监控设置完成，共 \(pois.count) 个", type: .success)
 
-            // 设置围栏进入回调
+            // 5. 设置围栏进入回调
             locationManager?.onRegionEntered = { [weak self] regionId in
                 Task { @MainActor in
                     self?.handleRegionEntered(regionId: regionId)
@@ -764,7 +842,8 @@ class ExplorationManager: ObservableObject {
             }
 
         } catch {
-            logger.log("搜索POI失败: \(error.localizedDescription)", type: .error)
+            logger.log("❌ 搜索POI失败: \(error.localizedDescription)", type: .error)
+            logger.log("错误详情: \(error)", type: .error)
         }
     }
 

@@ -233,8 +233,19 @@ struct MapViewRepresentable: UIViewRepresentable {
         let existingAnnotations = mapView.annotations.filter { $0 is POIAnnotation }
         mapView.removeAnnotations(existingAnnotations)
 
+        print("🗺️ [POI标注] 更新检查: isExploring=\(isExploring), nearbyPOIs.count=\(nearbyPOIs.count)")
+
         // 如果不在探索中，不显示POI
-        guard isExploring else { return }
+        guard isExploring else {
+            print("🗺️ [POI标注] 不在探索中，跳过显示")
+            return
+        }
+
+        // 如果没有POI，记录日志
+        if nearbyPOIs.isEmpty {
+            print("🗺️ [POI标注] ⚠️ POI列表为空，没有可显示的POI")
+            return
+        }
 
         // 添加新的POI标记
         for poi in nearbyPOIs {
@@ -243,11 +254,10 @@ struct MapViewRepresentable: UIViewRepresentable {
 
             let annotation = POIAnnotation(poi: poi, coordinate: gcj02Coordinate)
             mapView.addAnnotation(annotation)
+            print("🗺️ [POI标注] 添加: \(poi.name) at (\(String(format: "%.6f", gcj02Coordinate.latitude)), \(String(format: "%.6f", gcj02Coordinate.longitude)))")
         }
 
-        if !nearbyPOIs.isEmpty {
-            print("🗺️ 已添加 \(nearbyPOIs.count) 个POI标记")
-        }
+        print("🗺️ [POI标注] ✅ 已添加 \(nearbyPOIs.count) 个POI标记到地图")
     }
 
     // MARK: - Coordinator

@@ -21,6 +21,9 @@ struct MapTabView: View {
     /// 探索管理器（从 App 注入的全局实例）
     @EnvironmentObject var explorationManager: ExplorationManager
 
+    /// 玩家位置服务（从 App 注入的全局实例）
+    @EnvironmentObject var playerLocationService: PlayerLocationService
+
     /// 领地管理器
     private let territoryManager = TerritoryManager(supabase: supabase)
 
@@ -288,6 +291,16 @@ struct MapTabView: View {
                         .font(.system(size: 14, weight: .medium, design: .monospaced))
                 }
 
+                // 附近幸存者
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(densityColor)
+                    Text("\(playerLocationService.nearbyPlayerCount)")
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundColor(densityColor)
+                }
+
                 Spacer()
 
                 // 结束探索按钮
@@ -331,6 +344,20 @@ struct MapTabView: View {
         .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
         .transition(.move(edge: .top).combined(with: .opacity))
         .animation(.easeInOut(duration: 0.3), value: explorationManager.isExploring)
+    }
+
+    /// 根据密度等级返回对应颜色
+    private var densityColor: Color {
+        switch playerLocationService.densityLevel {
+        case .solo:
+            return .gray
+        case .low:
+            return .green
+        case .medium:
+            return .orange
+        case .high:
+            return .red
+        }
     }
 
     /// 距离下一等级的提示文本

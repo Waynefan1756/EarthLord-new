@@ -24,21 +24,30 @@ struct EarthLordApp: App {
     /// 探索管理器（延迟初始化，因为依赖其他Manager）
     @StateObject private var explorationManager: ExplorationManager
 
+    /// 玩家位置服务（用于附近玩家检测）
+    @StateObject private var playerLocationService: PlayerLocationService
+
     /// 启动页是否完成
     @State private var splashFinished = false
+
+    /// App生命周期状态
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // 创建共享实例
         let locManager = LocationManager()
         let invManager = InventoryManager(supabase: supabase)
+        let playerLocService = PlayerLocationService(supabase: supabase, locationManager: locManager)
         let expManager = ExplorationManager(
             supabase: supabase,
             locationManager: locManager,
-            inventoryManager: invManager
+            inventoryManager: invManager,
+            playerLocationService: playerLocService
         )
 
         _locationManager = StateObject(wrappedValue: locManager)
         _inventoryManager = StateObject(wrappedValue: invManager)
+        _playerLocationService = StateObject(wrappedValue: playerLocService)
         _explorationManager = StateObject(wrappedValue: expManager)
     }
 
@@ -61,6 +70,7 @@ struct EarthLordApp: App {
                         .environmentObject(locationManager)
                         .environmentObject(inventoryManager)
                         .environmentObject(explorationManager)
+                        .environmentObject(playerLocationService)
                 } else {
                     // 3️⃣ 未登录 → 认证页
                     AuthView(authManager: authManager)
@@ -72,6 +82,59 @@ struct EarthLordApp: App {
             .animation(.easeInOut(duration: 0.3), value: splashFinished)
             .animation(.easeInOut(duration: 0.3), value: authManager.isAuthenticated)
             .id(languageManager.currentLocale.identifier)
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                handleScenePhaseChange(newPhase)
+            }
+            .onAppear {
+                handleAppLaunch()
+            }
+        }
+    }
+
+    // MARK: - App生命周期处理
+
+    /// 处理App启动
+    private func handleAppLaunch() {
+        guard authManager.isAuthenticated else { return }
+
+        Task {
+            // 启动时上报位置
+            if let location = locationManager.userLocation {
+                await playerLocationService.reportLocation(location)
+            }
+
+            // 开始定时上报
+            playerLocationService.startPeriodicReporting()
+        }
+    }
+
+    /// 处理场景阶段变化
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        guard authManager.isAuthenticated else { return }
+
+        switch phase {
+        case .active:
+            // App进入前台
+            Task {
+                if let location = locationManager.userLocation {
+                    await playerLocationService.reportLocation(location)
+                }
+                playerLocationService.startPeriodicReporting()
+            }
+
+        case .background:
+            // App进入后台
+            Task {
+                await playerLocationService.markOffline()
+                playerLocationService.stopPeriodicReporting()
+            }
+
+        case .inactive:
+            // 过渡状态，不处理
+            break
+
+        @unknown default:
+            break
         }
     }
 }
