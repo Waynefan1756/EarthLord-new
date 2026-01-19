@@ -175,7 +175,10 @@ struct MapTabView: View {
                 POIProximityPopup(
                     poi: poi,
                     onScavenge: {
-                        explorationManager.performScavenge()
+                        // 异步调用 AI 生成搜刮
+                        Task {
+                            await explorationManager.performScavenge()
+                        }
                     },
                     onSkip: {
                         explorationManager.skipScavenge()
@@ -185,7 +188,7 @@ struct MapTabView: View {
                 .presentationDragIndicator(.visible)
             }
         }
-        // 搜刮结果弹窗
+        // 搜刮结果弹窗（传统物品，降级方案）
         .sheet(isPresented: $explorationManager.showScavengeResult) {
             if let poi = explorationManager.currentScavengePOI {
                 ScavengeResultView(
@@ -197,6 +200,22 @@ struct MapTabView: View {
                     }
                 )
                 .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        // AI 搜刮结果弹窗
+        .sheet(isPresented: $explorationManager.showAIScavengeResult) {
+            if let poi = explorationManager.currentScavengePOI {
+                AIScavengeResultView(
+                    poiName: poi.name,
+                    poiType: poi.type,
+                    dangerLevel: poi.dangerLevel,
+                    items: explorationManager.aiGeneratedItems,
+                    onClose: {
+                        explorationManager.closeAIScavengeResult()
+                    }
+                )
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
         }

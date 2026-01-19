@@ -182,14 +182,25 @@ class ExplorationManager: ObservableObject {
     /// 当前可搜刮的POI
     @Published var currentScavengePOI: ExplorablePOI?
 
-    /// 是否显示搜刮结果
+    /// 是否显示搜刮结果（传统物品）
     @Published var showScavengeResult: Bool = false
 
-    /// 搜刮获得的物品
+    /// 搜刮获得的物品（传统物品，降级方案使用）
     @Published var scavengeLootItems: [LootItem] = []
 
     /// 本次探索搜刮的POI数量
     @Published var scavengedPOICount: Int = 0
+
+    // MARK: - AI 物品生成相关
+
+    /// 是否正在执行搜刮（调用 AI 生成中）
+    @Published var isScavenging: Bool = false
+
+    /// AI 生成的物品列表
+    @Published var aiGeneratedItems: [AIGeneratedItem] = []
+
+    /// 是否显示 AI 搜刮结果
+    @Published var showAIScavengeResult: Bool = false
 
     // MARK: - Dependencies
 
@@ -862,32 +873,56 @@ class ExplorationManager: ObservableObject {
         showPOIPopup = true
     }
 
-    /// 执行搜刮
-    func performScavenge() {
+    /// 执行搜刮（异步，使用 AI 生成物品）
+    func performScavenge() async {
         guard let poi = currentScavengePOI else { return }
 
-        logger.log("开始搜刮: \(poi.name)", type: .info)
+        isScavenging = true
+        logger.log("开始搜刮: \(poi.name)，危险等级: \(poi.dangerLevel)", type: .info)
 
-        // 生成奖励（使用银级奖励作为POI搜刮的默认等级）
-        let tier = RewardTier.silver
-        let lootItems = RewardGenerator.generateRewards(tier: tier, source: poi.name)
+        // 根据危险等级确定物品数量（1-5个）
+        let itemCount = min(poi.dangerLevel + 1, 5)
 
-        // 保存搜刮结果
-        scavengeLootItems = lootItems
+        do {
+            // 尝试使用 AI 生成物品
+            let items = try await AIItemGenerator.shared.generateItems(for: poi, itemCount: itemCount)
 
-        // 标记POI已搜刮
-        if let index = nearbyPOIs.firstIndex(where: { $0.id == poi.id }) {
-            nearbyPOIs[index].isScavenged = true
-        }
+            // AI 生成成功
+            aiGeneratedItems = items
+            isScavenging = false
 
-        // 更新搜刮计数
-        scavengedPOICount += 1
+            // 标记 POI 已搜刮
+            markPOIAsScavenged(poi)
 
-        // 停止监控该围栏
-        locationManager?.stopMonitoringPOI(identifier: poi.regionIdentifier)
+            // 关闭接近弹窗，显示 AI 结果弹窗
+            showPOIPopup = false
+            showAIScavengeResult = true
 
-        // 添加物品到背包
-        Task {
+            logger.log("AI 生成成功，获得 \(items.count) 件物品", type: .success)
+
+            // 保存 AI 物品到背包（转换为 LootItem 格式）
+            await saveAIItemsToInventory(items)
+
+        } catch {
+            // AI 生成失败，使用降级方案
+            logger.log("AI 生成失败，使用降级方案: \(error.localizedDescription)", type: .warning)
+
+            // 降级到传统 RewardGenerator
+            let tier = RewardTier.silver
+            let lootItems = RewardGenerator.generateRewards(tier: tier, source: poi.name)
+            scavengeLootItems = lootItems
+            isScavenging = false
+
+            // 标记 POI 已搜刮
+            markPOIAsScavenged(poi)
+
+            // 显示传统结果弹窗
+            showPOIPopup = false
+            showScavengeResult = true
+
+            logger.log("降级方案：获得 \(lootItems.count) 件物品", type: .success)
+
+            // 保存到背包
             do {
                 try await inventoryManager?.addItems(lootItems, explorationSessionId: currentSessionId)
                 logger.log("物品已添加到背包: \(lootItems.count)件", type: .success)
@@ -895,12 +930,35 @@ class ExplorationManager: ObservableObject {
                 logger.log("添加物品失败: \(error)", type: .error)
             }
         }
+    }
 
-        // 关闭接近弹窗，显示结果弹窗
-        showPOIPopup = false
-        showScavengeResult = true
+    /// 标记 POI 已搜刮
+    private func markPOIAsScavenged(_ poi: ExplorablePOI) {
+        if let index = nearbyPOIs.firstIndex(where: { $0.id == poi.id }) {
+            nearbyPOIs[index].isScavenged = true
+        }
+        scavengedPOICount += 1
+        locationManager?.stopMonitoringPOI(identifier: poi.regionIdentifier)
+    }
 
-        logger.log("搜刮完成，获得 \(lootItems.count) 件物品", type: .success)
+    /// 保存 AI 物品到背包
+    private func saveAIItemsToInventory(_ items: [AIGeneratedItem]) async {
+        // 转换为 LootItem 格式（使用动态生成的 itemId）
+        let lootItems = items.map { item in
+            LootItem(
+                id: item.id,
+                itemId: "ai_\(item.category)_\(item.rarity)",
+                quantity: item.quantity,
+                quality: nil
+            )
+        }
+
+        do {
+            try await inventoryManager?.addItems(lootItems, explorationSessionId: currentSessionId)
+            logger.log("AI 物品已添加到背包: \(lootItems.count)件", type: .success)
+        } catch {
+            logger.log("添加 AI 物品失败: \(error)", type: .error)
+        }
     }
 
     /// 跳过搜刮
@@ -910,10 +968,17 @@ class ExplorationManager: ObservableObject {
         currentScavengePOI = nil
     }
 
-    /// 关闭搜刮结果
+    /// 关闭搜刮结果（传统物品）
     func closeScavengeResult() {
         showScavengeResult = false
         scavengeLootItems = []
+        currentScavengePOI = nil
+    }
+
+    /// 关闭 AI 搜刮结果
+    func closeAIScavengeResult() {
+        showAIScavengeResult = false
+        aiGeneratedItems = []
         currentScavengePOI = nil
     }
 
@@ -925,7 +990,9 @@ class ExplorationManager: ObservableObject {
         currentScavengePOI = nil
         showPOIPopup = false
         showScavengeResult = false
+        showAIScavengeResult = false
         scavengeLootItems = []
+        aiGeneratedItems = []
         scavengedPOICount = 0
         logger.log("已清理所有POI和围栏", type: .info)
     }

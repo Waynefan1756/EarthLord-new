@@ -61,6 +61,20 @@ enum POIType: String, Codable {
         case .residential: return "house.fill"
         }
     }
+
+    /// 默认危险等级（1-5）
+    /// 用于 AI 生成物品时决定稀有度分布
+    var defaultDangerLevel: Int {
+        switch self {
+        case .residential: return 1
+        case .gasStation: return 2
+        case .supermarket: return 3
+        case .pharmacy: return 3
+        case .warehouse: return 3
+        case .hospital: return 4
+        case .factory: return 4
+        }
+    }
 }
 
 /// 兴趣点（Point of Interest）模型
@@ -135,10 +149,23 @@ struct ExplorablePOI: Identifiable, Equatable {
     let type: POIType                       // POI类型
     let coordinate: CLLocationCoordinate2D  // 坐标位置（WGS-84）
     var isScavenged: Bool                   // 是否已搜刮
+    let dangerLevel: Int                    // 危险等级 1-5（用于 AI 物品生成）
 
     /// 围栏标识符（用于CLCircularRegion）
     var regionIdentifier: String {
         "poi_region_\(id)"
+    }
+
+    /// 初始化方法
+    init(id: String, name: String, type: POIType, coordinate: CLLocationCoordinate2D,
+         isScavenged: Bool, dangerLevel: Int? = nil) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.coordinate = coordinate
+        self.isScavenged = isScavenged
+        // 如果未提供危险等级，根据 POI 类型推断
+        self.dangerLevel = dangerLevel ?? type.defaultDangerLevel
     }
 
     /// 从 MKMapItem 创建 ExplorablePOI
@@ -158,7 +185,8 @@ struct ExplorablePOI: Identifiable, Equatable {
             name: name,
             type: poiType,
             coordinate: location.coordinate,
-            isScavenged: false
+            isScavenged: false,
+            dangerLevel: poiType.defaultDangerLevel
         )
     }
 
