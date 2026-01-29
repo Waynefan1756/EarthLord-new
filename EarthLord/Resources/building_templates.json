@@ -1,0 +1,77 @@
+[
+  {
+    "id": "campfire",
+    "name": "篝火",
+    "category": "survival",
+    "tier": 1,
+    "description": "简单的篝火，提供照明和取暖。",
+    "icon": "flame.fill",
+    "required_resources": {
+      "item_wood": 30,
+      "item_scrap_metal": 10
+    },
+    "build_time_seconds": 30,
+    "max_per_territory": 3,
+    "max_level": 5
+  },
+  {
+    "id": "shelter",
+    "name": "庇护所",
+    "category": "survival",
+    "tier": 1,
+    "description": "简易庇护所，提供基本休息场所。",
+    "icon": "house.fill",
+    "required_resources": {
+      "item_wood": 50,
+      "item_scrap_cloth": 20
+    },
+    "build_time_seconds": 60,
+    "max_per_territory": 1,
+    "max_level": 5
+  },
+  {
+    "id": "storage_small",
+    "name": "小仓库",
+    "category": "storage",
+    "tier": 1,
+    "description": "小型储存空间，可以存放更多物品。",
+    "icon": "archivebox.fill",
+    "required_resources": {
+      "item_wood": 40,
+      "item_scrap_metal": 20
+    },
+    "build_time_seconds": 45,
+    "max_per_territory": 2,
+    "max_level": 5
+  },
+  {
+    "id": "farm_simple",
+    "name": "简易农田",
+    "category": "production",
+    "tier": 1,
+    "description": "可以种植农作物，定期产出食物。",
+    "icon": "leaf.fill",
+    "required_resources": {
+      "item_wood": 20,
+      "item_rope": 3
+    },
+    "build_time_seconds": 40,
+    "max_per_territory": 3,
+    "max_level": 5
+  },
+  {
+    "id": "solar_panel",
+    "name": "太阳能板",
+    "category": "energy",
+    "tier": 2,
+    "description": "利用太阳能发电，为设施提供能源。",
+    "icon": "sun.max.fill",
+    "required_resources": {
+      "item_scrap_metal": 60,
+      "item_solar_charger": 1
+    },
+    "build_time_seconds": 90,
+    "max_per_territory": 2,
+    "max_level": 5
+  }
+]

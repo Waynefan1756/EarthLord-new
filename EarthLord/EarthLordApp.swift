@@ -27,6 +27,9 @@ struct EarthLordApp: App {
     /// 玩家位置服务（用于附近玩家检测）
     @StateObject private var playerLocationService: PlayerLocationService
 
+    /// 建筑管理器
+    @StateObject private var buildingManager: BuildingManager
+
     /// 启动页是否完成
     @State private var splashFinished = false
 
@@ -44,11 +47,13 @@ struct EarthLordApp: App {
             inventoryManager: invManager,
             playerLocationService: playerLocService
         )
+        let buildManager = BuildingManager(supabase: supabase, inventoryManager: invManager)
 
         _locationManager = StateObject(wrappedValue: locManager)
         _inventoryManager = StateObject(wrappedValue: invManager)
         _playerLocationService = StateObject(wrappedValue: playerLocService)
         _explorationManager = StateObject(wrappedValue: expManager)
+        _buildingManager = StateObject(wrappedValue: buildManager)
     }
 
     var body: some Scene {
@@ -71,6 +76,7 @@ struct EarthLordApp: App {
                         .environmentObject(inventoryManager)
                         .environmentObject(explorationManager)
                         .environmentObject(playerLocationService)
+                        .environmentObject(buildingManager)
                 } else {
                     // 3️⃣ 未登录 → 认证页
                     AuthView(authManager: authManager)
@@ -95,6 +101,11 @@ struct EarthLordApp: App {
 
     /// 处理App启动
     private func handleAppLaunch() {
+        // 加载建筑模板（无论是否登录都可以加载）
+        Task {
+            try? await buildingManager.loadTemplates()
+        }
+
         guard authManager.isAuthenticated else { return }
 
         Task {
