@@ -9,6 +9,13 @@ import Foundation
 import CoreLocation
 import Supabase
 
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// 领地更新通知
+    static let territoryUpdated = Notification.Name("territoryUpdated")
+}
+
 /// 领地管理器 - 负责上传和拉取领地数据
 @MainActor
 class TerritoryManager {
@@ -205,10 +212,35 @@ class TerritoryManager {
 
             print("✅ 成功删除领地：\(territoryId)")
             TerritoryLogger.shared.log("删除领地成功", type: .success)
+            NotificationCenter.default.post(name: .territoryUpdated, object: nil)
             return true
         } catch {
             print("❌ 删除领地失败：\(error.localizedDescription)")
             TerritoryLogger.shared.log("删除领地失败: \(error.localizedDescription)", type: .error)
+            return false
+        }
+    }
+
+    /// 更新领地名称
+    /// - Parameters:
+    ///   - territoryId: 领地 ID
+    ///   - name: 新名称
+    /// - Returns: 是否更新成功
+    func updateTerritoryName(territoryId: String, name: String) async -> Bool {
+        do {
+            try await supabase
+                .from("territories")
+                .update(["name": name])
+                .eq("id", value: territoryId)
+                .execute()
+
+            print("✅ 成功更新领地名称：\(name)")
+            TerritoryLogger.shared.log("领地重命名成功", type: .success)
+            NotificationCenter.default.post(name: .territoryUpdated, object: nil)
+            return true
+        } catch {
+            print("❌ 更新领地名称失败：\(error.localizedDescription)")
+            TerritoryLogger.shared.log("领地重命名失败: \(error.localizedDescription)", type: .error)
             return false
         }
     }

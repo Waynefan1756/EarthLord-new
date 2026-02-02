@@ -475,9 +475,18 @@ class BuildingManager: ObservableObject {
 
     // MARK: - Statistics
 
-    /// 获取指定类型建筑的数量
+    /// 获取指定类型建筑的数量（当前已加载领地）
     func getBuildingCount(templateId: String) -> Int {
         return buildings.filter { $0.template.id == templateId }.count
+    }
+
+    /// 获取指定领地中指定类型建筑的数量
+    /// - Parameters:
+    ///   - templateId: 建筑模板ID
+    ///   - territoryId: 领地ID
+    /// - Returns: 建筑数量
+    func getBuildingCount(templateId: String, territoryId: String) -> Int {
+        return buildings.filter { $0.template.id == templateId && $0.territoryId == territoryId }.count
     }
 
     /// 获取指定分类建筑的数量
@@ -493,5 +502,32 @@ class BuildingManager: ObservableObject {
     /// 获取已完成的建筑数量
     var activeCount: Int {
         return buildings.filter { $0.status == .active }.count
+    }
+
+    // MARK: - Demolition
+
+    /// 拆除建筑
+    /// - Parameter buildingId: 建筑ID
+    func demolishBuilding(buildingId: String) async throws {
+        guard let building = buildings.first(where: { $0.id == buildingId }) else {
+            throw BuildingError.buildingNotFound
+        }
+
+        do {
+            try await supabaseClient
+                .from("player_buildings")
+                .delete()
+                .eq("id", value: buildingId)
+                .execute()
+
+            print("[建筑] ✅ 拆除建筑: \(building.template.name)")
+
+            // 从本地列表中移除
+            buildings.removeAll { $0.id == buildingId }
+
+        } catch {
+            print("[建筑] ❌ 拆除建筑失败: \(error)")
+            throw BuildingError.databaseError(error.localizedDescription)
+        }
     }
 }

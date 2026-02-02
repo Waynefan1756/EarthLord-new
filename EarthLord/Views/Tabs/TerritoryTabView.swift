@@ -95,6 +95,12 @@ struct TerritoryTabView: View {
                     }
                 )
             }
+            // 监听领地更新通知
+            .onReceive(NotificationCenter.default.publisher(for: .territoryUpdated)) { _ in
+                Task {
+                    await loadMyTerritories()
+                }
+            }
         }
     }
 

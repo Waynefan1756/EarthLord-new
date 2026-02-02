@@ -203,6 +203,14 @@ struct PlayerBuilding: Identifiable {
     var canUpgrade: Bool {
         return status == .active && level < template.maxLevel
     }
+
+    /// 格式化剩余时间
+    var formattedRemainingTime: String {
+        guard let remaining = remainingBuildTime, remaining > 0 else { return "已完成" }
+        let minutes = Int(remaining) / 60
+        let seconds = Int(remaining) % 60
+        return minutes > 0 ? "\(minutes)分\(seconds)秒" : "\(seconds)秒"
+    }
 }
 
 // MARK: - 资源检查结果
