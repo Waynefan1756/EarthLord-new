@@ -34,6 +34,28 @@ private struct UpdateSellerRating: Codable {
     }
 }
 
+/// 接受交易的数据库函数响应
+private struct AcceptTradeResponse: Codable, Sendable {
+    let success: Bool
+    let error: String?
+    let history_id: UUID?
+    let seller_id: UUID?
+}
+
+/// 物品扣除信息（用于 RPC 调用）
+private struct ItemToDeduct: Codable, Sendable {
+    let inventory_item_id: String
+    let quantity: Int
+}
+
+/// 接受交易的 RPC 参数
+private struct AcceptTradeParams: Codable, Sendable {
+    let p_offer_id: String
+    let p_buyer_id: String
+    let p_buyer_username: String
+    let p_buyer_items_to_deduct: [ItemToDeduct]
+}
+
 /// 交易管理器
 /// 管理玩家之间的异步挂单交易系统
 @MainActor
@@ -244,14 +266,6 @@ class TradeManager: ObservableObject {
 
     // MARK: - 接受挂单
 
-    /// 接受交易的数据库函数响应
-    private struct AcceptTradeResponse: Codable {
-        let success: Bool
-        let error: String?
-        let history_id: UUID?
-        let seller_id: UUID?
-    }
-
     /// 接受挂单（执行交易）- 使用数据库事务确保原子性
     /// - Parameter offerId: 挂单ID
     /// - Returns: 创建的交易历史记录
@@ -290,7 +304,7 @@ class TradeManager: ObservableObject {
 
         // 验证买家背包中有足够的索取物品，并收集需要扣除的物品信息
         var insufficientItems: [String] = []
-        var itemsToDeduct: [[String: Any]] = []
+        var itemsToDeduct: [ItemToDeduct] = []
 
         for tradeItem in offer.requestingItems {
             let matchingItems = inventoryManager.items.filter { inventoryItem in
@@ -307,10 +321,10 @@ class TradeManager: ObservableObject {
                 for item in matchingItems {
                     if remainingToDeduct <= 0 { break }
                     let deductAmount = min(item.quantity, remainingToDeduct)
-                    itemsToDeduct.append([
-                        "inventory_item_id": item.id,
-                        "quantity": deductAmount
-                    ])
+                    itemsToDeduct.append(ItemToDeduct(
+                        inventory_item_id: item.id,
+                        quantity: deductAmount
+                    ))
                     remainingToDeduct -= deductAmount
                 }
             }
@@ -320,26 +334,24 @@ class TradeManager: ObservableObject {
             throw TradeError.insufficientItems(insufficientItems)
         }
 
-        // 转换为 JSON 字符串
-        guard let itemsToDeductData = try? JSONSerialization.data(withJSONObject: itemsToDeduct),
-              let itemsToDeductJson = String(data: itemsToDeductData, encoding: .utf8) else {
-            throw TradeError.databaseError("无法序列化物品数据")
+        // 构建 JSONB 数组参数
+        let itemsToDeductArray: [[String: AnyJSON]] = itemsToDeduct.map { item in
+            [
+                "inventory_item_id": AnyJSON.string(item.inventory_item_id),
+                "quantity": AnyJSON.integer(item.quantity)
+            ]
         }
 
         // 调用数据库事务函数
-        let result: [AcceptTradeResponse] = try await supabaseClient
+        let response: AcceptTradeResponse = try await supabaseClient
             .rpc("accept_trade_offer", params: [
-                "p_offer_id": offerId,
-                "p_buyer_id": buyerId.uuidString,
-                "p_buyer_username": buyerUsername,
-                "p_buyer_items_to_deduct": itemsToDeductJson
+                "p_offer_id": AnyJSON.string(offerId),
+                "p_buyer_id": AnyJSON.string(buyerId.uuidString),
+                "p_buyer_username": AnyJSON.string(buyerUsername),
+                "p_buyer_items_to_deduct": AnyJSON.array(itemsToDeductArray.map { AnyJSON.object($0) })
             ])
             .execute()
             .value
-
-        guard let response = result.first else {
-            throw TradeError.databaseError("数据库函数返回为空")
-        }
 
         // 检查事务是否成功
         guard response.success else {

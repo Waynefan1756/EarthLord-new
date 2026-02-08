@@ -30,6 +30,9 @@ struct EarthLordApp: App {
     /// 建筑管理器
     @StateObject private var buildingManager: BuildingManager
 
+    /// 交易管理器
+    @StateObject private var tradeManager: TradeManager
+
     /// 启动页是否完成
     @State private var splashFinished = false
 
@@ -48,12 +51,14 @@ struct EarthLordApp: App {
             playerLocationService: playerLocService
         )
         let buildManager = BuildingManager(supabase: supabase, inventoryManager: invManager)
+        let tradeMan = TradeManager(supabase: supabase, inventoryManager: invManager)
 
         _locationManager = StateObject(wrappedValue: locManager)
         _inventoryManager = StateObject(wrappedValue: invManager)
         _playerLocationService = StateObject(wrappedValue: playerLocService)
         _explorationManager = StateObject(wrappedValue: expManager)
         _buildingManager = StateObject(wrappedValue: buildManager)
+        _tradeManager = StateObject(wrappedValue: tradeMan)
     }
 
     var body: some Scene {
@@ -77,6 +82,7 @@ struct EarthLordApp: App {
                         .environmentObject(explorationManager)
                         .environmentObject(playerLocationService)
                         .environmentObject(buildingManager)
+                        .environmentObject(tradeManager)
                 } else {
                     // 3️⃣ 未登录 → 认证页
                     AuthView(authManager: authManager)
@@ -101,6 +107,9 @@ struct EarthLordApp: App {
 
     /// 处理App启动
     private func handleAppLaunch() {
+        // 设置交易管理器依赖（需要authManager）
+        tradeManager.setDependencies(inventoryManager: inventoryManager, authManager: authManager)
+
         // 加载建筑模板（无论是否登录都可以加载）
         Task {
             try? await buildingManager.loadTemplates()
