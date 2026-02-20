@@ -136,12 +136,28 @@ struct SettingsView: View {
                                         .padding(.leading, 60)
 
                                     SettingsRow(
+                                        icon: "questionmark.circle.fill",
+                                        iconColor: .blue,
+                                        title: "技术支持",
+                                        showChevron: true
+                                    ) {
+                                        if let url = URL(string: "https://waynefan1756.github.io/earthlord-support/") {
+                                            UIApplication.shared.open(url)
+                                        }
+                                    }
+
+                                    Divider()
+                                        .padding(.leading, 60)
+
+                                    SettingsRow(
                                         icon: "doc.text.fill",
                                         iconColor: .purple,
                                         title: "隐私政策",
                                         showChevron: true
                                     ) {
-                                        // TODO: 跳转到隐私政策页面
+                                        if let url = URL(string: "https://waynefan1756.github.io/earthlord-support/privacy.html") {
+                                            UIApplication.shared.open(url)
+                                        }
                                     }
                                 }
                                 .background(ApocalypseTheme.cardBackground)

@@ -251,21 +251,37 @@ class AuthManager: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        print("🔐 开始登录流程...")
+        print("📧 邮箱: \(email)")
+
         do {
+            print("📡 正在连接 Supabase...")
             let session = try await supabase.auth.signIn(
                 email: email,
                 password: password
             )
+            print("✅ Supabase 认证成功")
+            print("🆔 用户 ID: \(session.user.id)")
 
             // 获取用户资料
+            print("📋 正在获取用户资料...")
             if let user = try? await fetchUserProfile(userId: session.user.id) {
                 currentUser = user
+                print("✅ 用户资料获取成功")
+            } else {
+                print("⚠️ 用户资料不存在（profiles 表中没有记录）")
             }
 
             isAuthenticated = true
             needsPasswordSetup = false
+            print("🎉 登录流程完成")
 
-        } catch {
+        } catch let error as NSError {
+            print("❌ 登录失败")
+            print("❌ 错误域: \(error.domain)")
+            print("❌ 错误代码: \(error.code)")
+            print("❌ 错误描述: \(error.localizedDescription)")
+            print("❌ 错误详情: \(error)")
             errorMessage = "登录失败：\(error.localizedDescription)"
             isAuthenticated = false
         }
