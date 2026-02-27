@@ -192,4 +192,270 @@ final class CommunicationManager: ObservableObject {
     func isDeviceUnlocked(_ deviceType: DeviceType) -> Bool {
         devices.first(where: { $0.deviceType == deviceType })?.isUnlocked ?? false
     }
+
+    // MARK: - 频道属性
+
+    /// 公开频道列表
+    @Published var channels: [CommunicationChannel] = []
+
+    /// 我的已订阅频道（含订阅信息）
+    @Published var subscribedChannels: [SubscribedChannel] = []
+
+    /// 我的订阅记录
+    @Published var mySubscriptions: [ChannelSubscription] = []
+
+    // MARK: - 频道方法
+
+    /// 加载所有活跃的公开频道
+    func loadPublicChannels() async {
+        do {
+            let response: [CommunicationChannel] = try await client
+                .from("communication_channels")
+                .select()
+                .eq("is_active", value: true)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            channels = response
+        } catch {
+            errorMessage = "加载频道失败: \(error.localizedDescription)"
+        }
+    }
+
+    /// 加载用户已订阅的频道
+    /// - Parameter userId: 用户ID
+    func loadSubscribedChannels(userId: UUID) async {
+        do {
+            let subs: [ChannelSubscription] = try await client
+                .from("channel_subscriptions")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+                .value
+            mySubscriptions = subs
+
+            // 根据订阅记录加载频道详情
+            let channelIds = subs.map { $0.channelId.uuidString }
+            if channelIds.isEmpty {
+                subscribedChannels = []
+                return
+            }
+
+            let channelList: [CommunicationChannel] = try await client
+                .from("communication_channels")
+                .select()
+                .in("id", values: channelIds)
+                .execute()
+                .value
+
+            subscribedChannels = channelList.compactMap { ch in
+                guard let sub = subs.first(where: { $0.channelId == ch.id }) else { return nil }
+                return SubscribedChannel(channel: ch, subscription: sub)
+            }
+        } catch {
+            errorMessage = "加载订阅频道失败: \(error.localizedDescription)"
+        }
+    }
+
+    /// 创建频道（自动订阅创建者）
+    /// - Parameters:
+    ///   - userId: 创建者ID
+    ///   - type: 频道类型
+    ///   - name: 频道名称
+    ///   - description: 频道描述
+    func createChannel(userId: UUID, type: ChannelType, name: String, description: String?) async throws {
+        let params: [String: AnyJSON] = [
+            "p_creator_id": .string(userId.uuidString),
+            "p_channel_type": .string(type.rawValue),
+            "p_name": .string(name),
+            "p_description": description.map { .string($0) } ?? .null
+        ]
+
+        try await client
+            .rpc("create_channel_with_subscription", params: params)
+            .execute()
+
+        // 刷新列表
+        await loadPublicChannels()
+        await loadSubscribedChannels(userId: userId)
+    }
+
+    /// 订阅频道
+    /// - Parameters:
+    ///   - userId: 用户ID
+    ///   - channelId: 频道ID
+    func subscribeToChannel(userId: UUID, channelId: UUID) async throws {
+        struct SubscribeInsert: Encodable {
+            let userId: UUID
+            let channelId: UUID
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+                case channelId = "channel_id"
+            }
+        }
+
+        try await client
+            .from("channel_subscriptions")
+            .insert(SubscribeInsert(userId: userId, channelId: channelId))
+            .execute()
+
+        await loadSubscribedChannels(userId: userId)
+    }
+
+    /// 取消订阅频道
+    /// - Parameters:
+    ///   - userId: 用户ID
+    ///   - channelId: 频道ID
+    func unsubscribeFromChannel(userId: UUID, channelId: UUID) async throws {
+        try await client
+            .from("channel_subscriptions")
+            .delete()
+            .eq("user_id", value: userId.uuidString)
+            .eq("channel_id", value: channelId.uuidString)
+            .execute()
+
+        mySubscriptions.removeAll { $0.channelId == channelId }
+        subscribedChannels.removeAll { $0.channel.id == channelId }
+    }
+
+    /// 检查是否已订阅某频道
+    /// - Parameter channelId: 频道ID
+    func isSubscribed(channelId: UUID) -> Bool {
+        mySubscriptions.contains { $0.channelId == channelId }
+    }
+
+    /// 删除频道（仅限创建者）
+    /// - Parameter channelId: 频道ID
+    func deleteChannel(channelId: UUID) async throws {
+        try await client
+            .from("communication_channels")
+            .delete()
+            .eq("id", value: channelId.uuidString)
+            .execute()
+
+        channels.removeAll { $0.id == channelId }
+        subscribedChannels.removeAll { $0.channel.id == channelId }
+    }
+
+    // MARK: - 消息属性
+
+    @Published var channelMessages: [UUID: [ChannelMessage]] = [:]
+    @Published var isSendingMessage = false
+    @Published var subscribedChannelIds: Set<UUID> = []
+    private var realtimeChannel: RealtimeChannelV2?
+    private var messageSubscriptionTask: Task<Void, Never>?
+
+    // MARK: - 消息方法
+
+    /// 加载频道历史消息（最新 50 条，按时间升序）
+    func loadChannelMessages(channelId: UUID) async {
+        do {
+            let response: [ChannelMessage] = try await client
+                .from("channel_messages")
+                .select()
+                .eq("channel_id", value: channelId.uuidString)
+                .order("created_at", ascending: true)
+                .limit(50)
+                .execute()
+                .value
+            channelMessages[channelId] = response
+        } catch {
+            errorMessage = "加载消息失败: \(error.localizedDescription)"
+        }
+    }
+
+    /// 发送频道消息（通过 RPC）
+    @discardableResult
+    func sendChannelMessage(
+        channelId: UUID,
+        content: String,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        deviceType: String? = nil
+    ) async -> Bool {
+        isSendingMessage = true
+        defer { isSendingMessage = false }
+
+        var params: [String: AnyJSON] = [
+            "p_channel_id": .string(channelId.uuidString),
+            "p_content": .string(content)
+        ]
+        if let lat = latitude { params["p_latitude"] = .double(lat) }
+        if let lon = longitude { params["p_longitude"] = .double(lon) }
+        if let dt = deviceType { params["p_device_type"] = .string(dt) }
+
+        do {
+            try await client
+                .rpc("send_channel_message", params: params)
+                .execute()
+            // RPC 成功后主动刷新消息列表，作为 Realtime 的保底
+            await loadChannelMessages(channelId: channelId)
+            return true
+        } catch {
+            errorMessage = "发送失败: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// 启动 Realtime 订阅（监听所有已订阅频道的新消息）
+    func startRealtimeSubscription() {
+        guard realtimeChannel == nil else { return }
+
+        let channel = client.realtimeV2.channel("channel_messages_realtime")
+        realtimeChannel = channel
+
+        messageSubscriptionTask = Task {
+            try? await channel.subscribeWithError()
+            let changes = await channel.postgresChange(
+                InsertAction.self,
+                schema: "public",
+                table: "channel_messages"
+            )
+            for await insertion in changes {
+                await handleNewMessage(insertion: insertion)
+            }
+        }
+    }
+
+    /// 停止 Realtime 订阅
+    func stopRealtimeSubscription() {
+        messageSubscriptionTask?.cancel()
+        messageSubscriptionTask = nil
+        if let ch = realtimeChannel {
+            Task { await ch.unsubscribe() }
+        }
+        realtimeChannel = nil
+    }
+
+    /// 处理 Realtime 新消息插入事件
+    private func handleNewMessage(insertion: InsertAction) async {
+        let decoder = JSONDecoder()
+        guard let message = try? insertion.decodeRecord(as: ChannelMessage.self, decoder: decoder) else { return }
+        guard subscribedChannelIds.contains(message.channelId) else { return }
+        var list = channelMessages[message.channelId] ?? []
+        list.append(message)
+        channelMessages[message.channelId] = list
+    }
+
+    /// 为指定频道注册消息订阅（并按需启动 Realtime）
+    func subscribeToChannelMessages(channelId: UUID) {
+        subscribedChannelIds.insert(channelId)
+        if realtimeChannel == nil {
+            startRealtimeSubscription()
+        }
+    }
+
+    /// 取消指定频道的消息订阅（无订阅时停止 Realtime）
+    func unsubscribeFromChannelMessages(channelId: UUID) {
+        subscribedChannelIds.remove(channelId)
+        channelMessages.removeValue(forKey: channelId)
+        if subscribedChannelIds.isEmpty {
+            stopRealtimeSubscription()
+        }
+    }
+
+    /// 获取指定频道的消息列表
+    func getMessages(for channelId: UUID) -> [ChannelMessage] {
+        channelMessages[channelId] ?? []
+    }
 }
