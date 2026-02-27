@@ -333,4 +333,10 @@ struct ChannelMessage: Codable, Identifiable {
         default: return "\(Int(diff / 86400)) 天前"
         }
     }
+
+    /// 发送者设备类型（从 metadata 派生，向后兼容）
+    var senderDeviceType: DeviceType? {
+        guard let typeString = metadata?.deviceType else { return nil }
+        return DeviceType(rawValue: typeString)
+    }
 }

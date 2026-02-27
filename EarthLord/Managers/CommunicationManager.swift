@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import CoreLocation
 import Supabase
 
 // MARK: - 设备解锁更新模型
@@ -405,12 +406,13 @@ final class CommunicationManager: ObservableObject {
         realtimeChannel = channel
 
         messageSubscriptionTask = Task {
-            try? await channel.subscribeWithError()
+            // 必须先注册监听器，再 subscribe，否则服务端不知道推送什么事件
             let changes = await channel.postgresChange(
                 InsertAction.self,
                 schema: "public",
                 table: "channel_messages"
             )
+            try? await channel.subscribeWithError()
             for await insertion in changes {
                 await handleNewMessage(insertion: insertion)
             }
@@ -431,8 +433,19 @@ final class CommunicationManager: ObservableObject {
     private func handleNewMessage(insertion: InsertAction) async {
         let decoder = JSONDecoder()
         guard let message = try? insertion.decodeRecord(as: ChannelMessage.self, decoder: decoder) else { return }
+
+        // 第一关：已订阅频道
         guard subscribedChannelIds.contains(message.channelId) else { return }
+
+        // 第二关：距离过滤（仅非 official 频道）
+        let channelType = subscribedChannels.first(where: { $0.channel.id == message.channelId })?.channel.channelType
+        if channelType != .official {
+            guard shouldReceiveMessage(message) else { return }
+        }
+
+        // 去重后追加
         var list = channelMessages[message.channelId] ?? []
+        guard !list.contains(where: { $0.id == message.id }) else { return }
         list.append(message)
         channelMessages[message.channelId] = list
     }
@@ -457,5 +470,69 @@ final class CommunicationManager: ObservableObject {
     /// 获取指定频道的消息列表
     func getMessages(for channelId: UUID) -> [ChannelMessage] {
         channelMessages[channelId] ?? []
+    }
+
+    // MARK: - 距离过滤
+
+    /// 判断当前设备是否应该接收该消息
+    private func shouldReceiveMessage(_ message: ChannelMessage) -> Bool {
+        // 无当前设备 → 保守显示
+        guard let myDevice = currentDevice else {
+            print("⚠️ [距离过滤] 保守显示（无当前设备）")
+            return true
+        }
+        // 我是收音机 → 无限接收
+        if myDevice.deviceType == .radio { return true }
+        // 消息缺 senderDeviceType → 向后兼容
+        guard let senderDevice = message.senderDeviceType else {
+            print("⚠️ [距离过滤] 保守显示（无发送者设备类型）")
+            return true
+        }
+        // 消息缺 senderLocation → 保守显示
+        guard let senderLocation = message.senderLocation else {
+            print("⚠️ [距离过滤] 保守显示（无发送者位置）")
+            return true
+        }
+        // 我的位置获取失败 → 保守显示
+        guard let myLocation = getCurrentLocation() else {
+            print("⚠️ [距离过滤] 保守显示（无法获取我的位置）")
+            return true
+        }
+
+        let distance = calculateDistance(from: senderLocation, to: myLocation)
+        let result = canReceiveMessage(senderDevice: senderDevice, myDevice: myDevice.deviceType, distance: distance)
+        if result {
+            print("✅ [距离过滤] 通过（距离 \(String(format: "%.1f", distance)) km）")
+        } else {
+            print("🚫 [距离过滤] 丢弃（距离 \(String(format: "%.1f", distance)) km，超出范围）")
+        }
+        return result
+    }
+
+    /// 根据发送者设备、我的设备和距离判断能否接收
+    private func canReceiveMessage(senderDevice: DeviceType, myDevice: DeviceType, distance: Double) -> Bool {
+        switch (senderDevice, myDevice) {
+        case (.walkieTalkie, .walkieTalkie): return distance <= 3.0
+        case (.walkieTalkie, .campRadio):    return distance <= 30.0
+        case (.walkieTalkie, .satellite):   return distance <= 100.0
+        case (.campRadio, .walkieTalkie):   return distance <= 30.0
+        case (.campRadio, .campRadio):      return distance <= 30.0
+        case (.campRadio, .satellite):      return distance <= 100.0
+        case (.satellite, _):               return distance <= 100.0
+        default: return false
+        }
+    }
+
+    /// 计算两点之间的距离（公里）
+    private func calculateDistance(from: LocationPoint, to: LocationPoint) -> Double {
+        let fromLocation = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLocation = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        return fromLocation.distance(from: toLocation) / 1000.0
+    }
+
+    /// 获取当前位置（Day 35-B：接入真实 GPS）
+    private func getCurrentLocation() -> LocationPoint? {
+        guard let coord = LocationManager.shared.userLocation else { return nil }
+        return LocationPoint(latitude: coord.latitude, longitude: coord.longitude)
     }
 }

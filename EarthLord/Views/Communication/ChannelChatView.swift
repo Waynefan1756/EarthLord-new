@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct ChannelChatView: View {
     let channel: CommunicationChannel
@@ -197,9 +198,12 @@ struct ChannelChatView: View {
         messageText = ""
         Task {
             let deviceType = communicationManager.getCurrentDeviceType().rawValue
+            let coord = LocationManager.shared.userLocation
             await communicationManager.sendChannelMessage(
                 channelId: channel.id,
                 content: text,
+                latitude: coord?.latitude,
+                longitude: coord?.longitude,
                 deviceType: deviceType
             )
         }

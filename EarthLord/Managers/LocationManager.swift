@@ -15,6 +15,8 @@ import UIKit
 /// 负责请求定位权限、获取用户位置、处理定位错误
 class LocationManager: NSObject, ObservableObject {
 
+    static let shared = LocationManager()
+
     // MARK: - Properties
 
     /// CoreLocation 管理器
