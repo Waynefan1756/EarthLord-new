@@ -472,6 +472,73 @@ final class CommunicationManager: ObservableObject {
         channelMessages[channelId] ?? []
     }
 
+    // MARK: - 官方频道
+
+    /// 官方频道固定 UUID
+    static let officialChannelId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+
+    /// 确保用户订阅了官方频道（强制订阅）
+    func ensureOfficialChannelSubscribed(userId: UUID) async {
+        let officialId = CommunicationManager.officialChannelId
+        if subscribedChannels.contains(where: { $0.channel.id == officialId }) {
+            print("✅ [官方频道] 已订阅")
+            return
+        }
+        do {
+            try await subscribeToChannel(userId: userId, channelId: officialId)
+            print("✅ [官方频道] 已自动订阅")
+        } catch {
+            print("❌ [官方频道] 订阅失败: \(error)")
+        }
+    }
+
+    /// 检查是否是官方频道
+    func isOfficialChannel(_ channelId: UUID) -> Bool {
+        channelId == CommunicationManager.officialChannelId
+    }
+
+    // MARK: - 消息聚合
+
+    /// 获取所有订阅频道的摘要（官方频道置顶，其余按最新消息时间排序）
+    func getChannelSummaries() -> [ChannelSummary] {
+        subscribedChannels.map { sub in
+            let messages = channelMessages[sub.channel.id] ?? []
+            return ChannelSummary(channel: sub.channel, lastMessage: messages.last, unreadCount: 0)
+        }.sorted { a, b in
+            if a.channel.channelType == .official && b.channel.channelType != .official { return true }
+            if a.channel.channelType != .official && b.channel.channelType == .official { return false }
+            let t1 = a.lastMessage?.createdAt ?? a.channel.createdAt
+            let t2 = b.lastMessage?.createdAt ?? b.channel.createdAt
+            return t1 > t2
+        }
+    }
+
+    /// 加载所有订阅频道的最新一条消息（消息聚合页初始化）
+    func loadAllChannelLatestMessages() async {
+        for sub in subscribedChannels {
+            let channelId = sub.channel.id
+            do {
+                let messages: [ChannelMessage] = try await client
+                    .from("channel_messages")
+                    .select()
+                    .eq("channel_id", value: channelId.uuidString)
+                    .order("created_at", ascending: false)
+                    .limit(1)
+                    .execute()
+                    .value
+                if let last = messages.first {
+                    if channelMessages[channelId] == nil {
+                        channelMessages[channelId] = [last]
+                    } else if !(channelMessages[channelId]!.contains(where: { $0.id == last.id })) {
+                        channelMessages[channelId]?.append(last)
+                    }
+                }
+            } catch {
+                print("❌ [消息聚合] 频道 \(channelId) 加载失败: \(error)")
+            }
+        }
+    }
+
     // MARK: - 距离过滤
 
     /// 判断当前设备是否应该接收该消息

@@ -16,6 +16,7 @@ struct DeviceManagementView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var showUnlockAlert = false
     @State private var selectedDeviceForUnlock: DeviceType?
+    @State private var showingCallsignSettings = false
 
     // MARK: - Body
 
@@ -49,10 +50,46 @@ struct DeviceManagementView: View {
                         deviceCard(deviceType)
                     }
                 }
+
+                Divider()
+                    .background(ApocalypseTheme.textSecondary.opacity(0.3))
+                    .padding(.vertical, 4)
+
+                // 呼号设置入口
+                Button(action: { showingCallsignSettings = true }) {
+                    HStack {
+                        Image(systemName: "person.text.rectangle")
+                            .font(.system(size: 20))
+                            .foregroundColor(ApocalypseTheme.primary)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("呼号设置")
+                                .font(.headline)
+                                .foregroundColor(ApocalypseTheme.textPrimary)
+                            Text("设置您的电台身份标识")
+                                .font(.caption)
+                                .foregroundColor(ApocalypseTheme.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
+                            .foregroundColor(ApocalypseTheme.textSecondary)
+                    }
+                    .padding(16)
+                    .background(ApocalypseTheme.cardBackground)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(16)
         }
         .background(ApocalypseTheme.background)
+        .sheet(isPresented: $showingCallsignSettings) {
+            CallsignSettingsSheet()
+                .environmentObject(authManager)
+        }
         .alert("设备未解锁", isPresented: $showUnlockAlert) {
             Button("确定", role: .cancel) {}
         } message: {

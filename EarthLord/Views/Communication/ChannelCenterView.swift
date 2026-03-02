@@ -15,6 +15,7 @@ struct ChannelCenterView: View {
     @State private var selectedTab = 0       // 0=我的频道, 1=发现频道
     @State private var showCreateSheet = false
     @State private var selectedChannel: CommunicationChannel?
+    @State private var selectedOfficialChannel: CommunicationChannel?
     @State private var searchText = ""
 
     var filteredPublicChannels: [CommunicationChannel] {
@@ -57,6 +58,9 @@ struct ChannelCenterView: View {
             ChannelDetailView(channel: channel)
                 .environmentObject(authManager)
                 .onDisappear { reloadData() }
+        }
+        .sheet(item: $selectedOfficialChannel) { channel in
+            OfficialChannelDetailView(channel: channel)
         }
         .onAppear { reloadData() }
     }
@@ -146,7 +150,13 @@ struct ChannelCenterView: View {
                     LazyVStack(spacing: 8) {
                         ForEach(communicationManager.subscribedChannels) { subscribed in
                             ChannelRowView(channel: subscribed.channel, isSubscribed: true)
-                                .onTapGesture { selectedChannel = subscribed.channel }
+                                .onTapGesture {
+                                    if subscribed.channel.channelType == .official {
+                                        selectedOfficialChannel = subscribed.channel
+                                    } else {
+                                        selectedChannel = subscribed.channel
+                                    }
+                                }
                         }
                     }
                     .padding(.horizontal, 16)

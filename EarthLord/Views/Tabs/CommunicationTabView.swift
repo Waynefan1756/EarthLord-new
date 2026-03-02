@@ -32,7 +32,11 @@ struct CommunicationTabView: View {
         }
         .onAppear {
             if let userId = authManager.currentUser?.id {
-                Task { await communicationManager.loadDevices(userId: userId) }
+                Task {
+                    await communicationManager.loadDevices(userId: userId)
+                    await communicationManager.loadSubscribedChannels(userId: userId)
+                    await communicationManager.ensureOfficialChannelSubscribed(userId: userId)
+                }
             }
         }
     }

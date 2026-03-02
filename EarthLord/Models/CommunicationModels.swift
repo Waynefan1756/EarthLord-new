@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - 设备类型
 
@@ -171,7 +172,7 @@ enum ChannelType: String, Codable, CaseIterable {
 // MARK: - 频道模型
 
 /// 通讯频道
-struct CommunicationChannel: Codable, Identifiable {
+struct CommunicationChannel: Codable, Identifiable, Hashable {
     let id: UUID
     let creatorId: UUID
     let channelType: ChannelType
@@ -195,6 +196,9 @@ struct CommunicationChannel: Codable, Identifiable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
+
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: CommunicationChannel, rhs: CommunicationChannel) -> Bool { lhs.id == rhs.id }
 }
 
 // MARK: - 订阅记录
@@ -225,13 +229,62 @@ struct SubscribedChannel: Identifiable {
     let subscription: ChannelSubscription
 }
 
+// MARK: - 消息分类（官方频道专用）
+
+enum MessageCategory: String, Codable, CaseIterable {
+    case survival = "survival"
+    case news = "news"
+    case mission = "mission"
+    case alert = "alert"
+
+    var displayName: String {
+        switch self {
+        case .survival: return "生存指南"
+        case .news: return "游戏资讯"
+        case .mission: return "任务发布"
+        case .alert: return "紧急广播"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .survival: return .green
+        case .news: return .blue
+        case .mission: return .orange
+        case .alert: return .red
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .survival: return "leaf.fill"
+        case .news: return "newspaper.fill"
+        case .mission: return "target"
+        case .alert: return "exclamationmark.triangle.fill"
+        }
+    }
+}
+
 // MARK: - 消息元数据
 
 struct MessageMetadata: Codable {
     let deviceType: String?
+    let category: String?
+
     enum CodingKeys: String, CodingKey {
         case deviceType = "device_type"
+        case category
     }
+}
+
+// MARK: - 频道摘要（消息聚合页）
+
+struct ChannelSummary: Identifiable {
+    let channel: CommunicationChannel
+    let lastMessage: ChannelMessage?
+    let unreadCount: Int
+
+    var id: UUID { channel.id }
 }
 
 // MARK: - 位置点（PostGIS WKT 解析）
@@ -338,5 +391,11 @@ struct ChannelMessage: Codable, Identifiable {
     var senderDeviceType: DeviceType? {
         guard let typeString = metadata?.deviceType else { return nil }
         return DeviceType(rawValue: typeString)
+    }
+
+    /// 消息分类（官方频道专用）
+    var category: MessageCategory? {
+        guard let categoryString = metadata?.category else { return nil }
+        return MessageCategory(rawValue: categoryString)
     }
 }
